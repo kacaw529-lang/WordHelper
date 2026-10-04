@@ -35,52 +35,102 @@ const Matcher = (() => {
     return sameSound(heard, target);
   }
 
-  /* 詞語讀音：0–100 */
-  function scoreWord(list, word, zhuyin) {
+  /* 詞語讀音：回傳分數（0–100）與每個字是否念對 */
+  function detailWord(list, word, zhuyin) {
     const t = Array.from(word);
     const syl = splitZhuyin(zhuyin);
     const aligned = syl.length === t.length;
-    let best = 0;
+    let best = { score: 0, hits: t.map(() => false) };
     for (const raw of list || []) {
       const h = chars(raw);
       if (!h.length) continue;
-      if (h.join('').includes(word)) return 100;
+      if (h.join('').includes(word)) return { score: 100, hits: t.map(() => true) };
       const windows = Math.max(1, h.length - t.length + 1);
       for (let s = 0; s < windows; s++) {
-        let hit = 0;
-        for (let j = 0; j < t.length; j++) {
-          const c = h[s + j];
-          if (c && charOk(c, t[j], aligned ? syl[j] : null)) hit++;
-        }
-        best = Math.max(best, Math.round(hit / t.length * 100));
+        const hits = t.map((c, j) => !!(h[s + j] && charOk(h[s + j], c, aligned ? syl[j] : null)));
+        const score = Math.round(hits.filter(Boolean).length / t.length * 100);
+        if (score > best.score) best = { score, hits };
       }
     }
     return best;
   }
 
-  /* 解釋跟讀：最長共同子序列（同音字視為相同）／原文字數 */
-  function scoreText(list, text) {
+  /* 解釋跟讀：最長共同子序列（同音字視為相同）；hits 對應文字中的每個國字 */
+  function detailText(list, text) {
     const t = chars(text);
-    if (!t.length) return 100;
-    let best = 0;
+    if (!t.length) return { score: 100, hits: [] };
+    let best = { score: 0, hits: t.map(() => false) };
     for (const raw of list || []) {
       const h = chars(raw);
       if (!h.length) continue;
-      best = Math.max(best, Math.round(lcs(h, t) / t.length * 100));
+      const r = lcsHits(h, t);
+      const score = Math.min(100, Math.round(r.len / t.length * 100));
+      if (score > best.score) best = { score, hits: r.hits };
     }
-    return Math.min(100, best);
+    return best;
   }
 
-  function lcs(a, b) {
-    let prev = new Array(b.length + 1).fill(0);
-    for (let i = 1; i <= a.length; i++) {
-      const cur = new Array(b.length + 1).fill(0);
-      for (let j = 1; j <= b.length; j++) {
-        cur[j] = sameSound(a[i - 1], b[j - 1]) ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+  const scoreWord = (list, word, zhuyin) => detailWord(list, word, zhuyin).score;
+  const scoreText = (list, text) => detailText(list, text).score;
+
+  function lcsHits(a, b) {
+    const n = a.length, m = b.length;
+    const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+    for (let i = 1; i <= n; i++) {
+      for (let j = 1; j <= m; j++) {
+        dp[i][j] = sameSound(a[i - 1], b[j - 1]) ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
       }
-      prev = cur;
     }
-    return prev[b.length];
+    const hits = new Array(m).fill(false);
+    let i = n, j = m;
+    while (i > 0 && j > 0) {
+      if (sameSound(a[i - 1], b[j - 1]) && dp[i][j] === dp[i - 1][j - 1] + 1) { hits[j - 1] = true; i--; j--; }
+      else if (dp[i - 1][j] >= dp[i][j - 1]) i--;
+      else j--;
+    }
+    return { len: dp[n][m], hits };
+  }
+
+  /**
+   * 把文字拆成字元，標記哪些是要念的國字（數字也算），並對上注音。
+   * zy：以 | 分隔、依序對應每個國字的注音（後端產生）。
+   */
+  function tokens(text, zy) {
+    const z = String(zy || '').split('|');
+    let k = 0;
+    return Array.from(String(text || '')).map(ch => {
+      const h = DIGIT[ch] || ch;
+      if (HAN.test(h)) return { ch, han: true, i: k, zy: z[k++] || '' };
+      return { ch, han: false };
+    });
+  }
+
+  /**
+   * 依標點切成適合三年級一次跟讀的短句：在 ，。；！？： 後切開，
+   * 太短的句子（少於 4 個字）併入下一句，最後一句太短則併回上一句。
+   */
+  function segments(toks) {
+    const BREAK = '，。；！？：,;!?:';
+    const segs = [];
+    let cur = [];
+    toks.forEach(t => {
+      cur.push(t);
+      if (BREAK.includes(t.ch)) { segs.push(cur); cur = []; }
+    });
+    if (cur.some(t => t.han)) segs.push(cur);
+    else if (cur.length && segs.length) segs[segs.length - 1].push(...cur);
+    const count = seg => seg.filter(t => t.han).length;
+    const merged = [];
+    segs.forEach(seg => {
+      const last = merged[merged.length - 1];
+      if (last && count(last) < 4) last.push(...seg);
+      else merged.push(seg);
+    });
+    if (merged.length > 1 && count(merged[merged.length - 1]) < 4) {
+      const tail = merged.pop();
+      merged[merged.length - 1].push(...tail);
+    }
+    return merged.filter(seg => count(seg) > 0);
   }
 
   function monoIndex() {
@@ -120,5 +170,5 @@ const Matcher = (() => {
     return out;
   }
 
-  return { setCharmap, ttsText, splitZhuyin, scoreWord, scoreText, chars, size: () => Object.keys(map).length };
+  return { setCharmap, ttsText, splitZhuyin, scoreWord, scoreText, detailWord, detailText, tokens, segments, chars, size: () => Object.keys(map).length };
 })();

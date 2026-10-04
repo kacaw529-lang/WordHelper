@@ -39,7 +39,9 @@
     fillStudentSelect();
     $('log-to').value = DateTW.today();
     $('log-from').value = DateTW.addDays(DateTW.today(), -6);
+    resetAssignForm();
     loadLogs();
+    loadAssignments();
   }
 
   $('login-form').addEventListener('submit', async e => {
@@ -135,6 +137,7 @@
       students = data.students;
       renderStudents();
       fillStudentSelect();
+      if (!$('as-id').value) renderTargets(['全部']);
       msg('stu-msg', '已儲存學生');
     } catch (err) {
       msg('stu-msg', err.message, true);
@@ -156,17 +159,25 @@
     const form = $('set-form');
     form.innerHTML = '';
     settings.forEach(d => {
-      const input = el('input', {
-        className: 'input', type: 'number', name: d.key, value: d.value,
-        min: d.min, max: d.max, step: d.key === 'rate' ? 0.1 : 1
-      });
-      form.append(el('label', {}, [el('span', { textContent: d.name }), input, el('small', { textContent: d.desc + '（' + d.min + '～' + d.max + '）' })]));
+      let input;
+      let note = d.desc;
+      if (d.type === 'select') {
+        input = el('select', { className: 'input', name: d.key });
+        d.options.forEach(o => input.append(el('option', { value: o[0], textContent: o[1], selected: o[0] === d.value })));
+      } else {
+        input = el('input', {
+          className: 'input', type: 'number', name: d.key, value: d.value,
+          min: d.min, max: d.max, step: d.key === 'rate' ? 0.1 : 1
+        });
+        note += '（' + d.min + '～' + d.max + '）';
+      }
+      form.append(el('label', {}, [el('span', { textContent: d.name }), input, el('small', { textContent: note })]));
     });
   }
 
   $('set-save').addEventListener('click', async () => {
     const out = {};
-    $('set-form').querySelectorAll('input').forEach(i => { out[i.name] = Number(i.value); });
+    $('set-form').querySelectorAll('input, select').forEach(i => { out[i.name] = i.tagName === 'SELECT' ? i.value : Number(i.value); });
     msg('set-msg', '儲存中…');
     try {
       const data = await call('adminSaveSettings', { settings: out });
@@ -202,11 +213,13 @@
       const lv = el('select', { className: 'input', ariaLabel: w.w + ' 的難度' });
       for (let g = 1; g <= 6; g++) lv.append(el('option', { value: g, textContent: g + ' 年級起', selected: w.lv === g }));
       const blocked = el('input', { type: 'checkbox', checked: !!w.blocked, ariaLabel: '封鎖 ' + w.w });
+      const te = el('textarea', { className: 'input te-input', value: w.te || '', rows: 2, maxLength: 80,
+        placeholder: '可留白', ariaLabel: w.w + ' 的老師解釋' });
       const status = el('span', { className: 'form-msg' });
       const save = async () => {
         status.textContent = '儲存中…';
         try {
-          await call('adminUpdateWord', { row: w.row, word: w.w, lv: Number(lv.value), blocked: blocked.checked });
+          await call('adminUpdateWord', { row: w.row, word: w.w, lv: Number(lv.value), blocked: blocked.checked, te: te.value.trim() });
           status.textContent = '已儲存';
         } catch (err) {
           status.textContent = err.message;
@@ -214,12 +227,141 @@
       };
       lv.addEventListener('change', save);
       blocked.addEventListener('change', save);
+      te.addEventListener('change', save);
       body.append(el('tr', {}, [
         el('td', { className: 'kai', textContent: w.w }),
         el('td', { textContent: w.z }),
         el('td', { className: 'wrap', textContent: w.d }),
+        el('td', { className: 'wrap' }, [te]),
         el('td', {}, [lv]),
         el('td', {}, [el('div', { className: 'link-cell' }, [blocked, status])])
+      ]));
+    });
+  }
+
+  /* ───────── 指派生字 ───────── */
+
+  let assignments = [];
+  const HANS = v => {
+    const seen = new Set();
+    return Array.from(String(v || '')).filter(c => HAN.test(c) && !seen.has(c) && seen.add(c));
+  };
+
+  function renderTargets(selected) {
+    const box = $('as-targets');
+    box.innerHTML = '';
+    const all = !selected || !selected.length || selected.includes('全部');
+    const allBox = el('input', { type: 'checkbox', value: '全部', checked: all });
+    box.append(el('label', { className: 'check' }, [allBox, '全部學生']));
+    const boxes = students.filter(s => s.enabled !== false).map(s => {
+      const cb = el('input', { type: 'checkbox', value: s.id, checked: !all && selected.includes(s.id), disabled: all });
+      box.append(el('label', { className: 'check' }, [cb, s.name || s.id]));
+      return cb;
+    });
+    allBox.addEventListener('change', () => boxes.forEach(cb => { cb.disabled = allBox.checked; if (allBox.checked) cb.checked = false; }));
+  }
+
+  function selectedTargets() {
+    const boxes = Array.from($('as-targets').querySelectorAll('input[type=checkbox]'));
+    if (boxes[0] && boxes[0].checked) return ['全部'];
+    return boxes.slice(1).filter(cb => cb.checked).map(cb => cb.value);
+  }
+
+  function resetAssignForm() {
+    $('as-id').value = '';
+    $('as-title').value = '';
+    $('as-chars').value = '';
+    $('as-start').value = DateTW.today();
+    $('as-end').value = DateTW.addDays(DateTW.today(), 6);
+    $('as-save').textContent = '新增指派';
+    $('as-cancel').hidden = true;
+    renderTargets(['全部']);
+  }
+
+  function editAssignment(a) {
+    $('as-id').value = a.id;
+    $('as-title').value = a.title;
+    $('as-chars').value = a.chars;
+    $('as-start').value = DateTW.normalize(a.start);
+    $('as-end').value = DateTW.normalize(a.end);
+    $('as-save').textContent = '儲存修改';
+    $('as-cancel').hidden = false;
+    renderTargets(a.targets);
+    $('as-title').focus();
+    msg('as-msg', '修改後按「儲存修改」');
+  }
+
+  $('as-cancel').addEventListener('click', () => { resetAssignForm(); msg('as-msg', ''); });
+
+  $('as-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const chars = HANS($('as-chars').value);
+    if (!chars.length) return msg('as-msg', '請輸入至少一個生字', true);
+    const start = DateTW.normalize($('as-start').value);
+    const end = DateTW.normalize($('as-end').value);
+    if (!start || !end) return msg('as-msg', '請選擇開始與結束日期', true);
+    if (end < start) return msg('as-msg', '結束日期不能早於開始日期', true);
+    const targets = selectedTargets();
+    if (!targets.length) return msg('as-msg', '請選擇指派對象', true);
+    msg('as-msg', '儲存中…');
+    try {
+      const data = await call('adminSaveAssignment', {
+        assignment: { id: $('as-id').value, title: $('as-title').value.trim(), chars: chars.join(''), start, end, targets }
+      });
+      assignments = data.assignments;
+      renderAssignments();
+      resetAssignForm();
+      msg('as-msg', '已儲存指派');
+    } catch (err) {
+      msg('as-msg', err.message, true);
+    }
+  });
+
+  async function loadAssignments() {
+    try {
+      const data = await call('adminAssignments');
+      assignments = data.assignments;
+      renderAssignments();
+    } catch (err) {
+      msg('as-msg', err.message, true);
+    }
+  }
+
+  const md = ymd => {
+    const p = DateTW.normalize(ymd).split('-');
+    return p.length === 3 ? Number(p[1]) + '/' + Number(p[2]) : '';
+  };
+
+  function renderAssignments() {
+    const body = $('as-body');
+    body.innerHTML = '';
+    if (!assignments.length) {
+      body.append(el('tr', {}, [el('td', { colSpan: 6, textContent: '還沒有指派' })]));
+      return;
+    }
+    assignments.forEach(a => {
+      const progress = el('div', { className: 'progress-list' }, a.progress.map(p =>
+        el('span', { className: 'tag' + (p.total && p.done === p.total ? ' tag-done' : ''), textContent: nameOf(p.id) + ' ' + p.done + '／' + p.total })));
+      const edit = el('button', { className: 'btn btn-text', type: 'button', textContent: '編輯' });
+      edit.addEventListener('click', () => editAssignment(a));
+      const del = el('button', { className: 'btn btn-text', type: 'button', textContent: '刪除' });
+      del.addEventListener('click', async () => {
+        if (!confirm('確定刪除「' + a.title + '」？練習紀錄不會被刪除。')) return;
+        try {
+          const data = await call('adminDeleteAssignment', { id: a.id });
+          assignments = data.assignments;
+          renderAssignments();
+        } catch (err) {
+          msg('as-msg', err.message, true);
+        }
+      });
+      body.append(el('tr', {}, [
+        el('td', {}, [el('span', { className: 'tag' + (a.status === '進行中' ? ' tag-live' : ''), textContent: a.status })]),
+        el('td', { textContent: a.title }),
+        el('td', { className: 'kai', textContent: a.chars }),
+        el('td', { textContent: md(a.start) + '～' + md(a.end) }),
+        el('td', { className: 'wrap' }, [progress]),
+        el('td', {}, [el('div', { className: 'link-cell' }, [edit, del])])
       ]));
     });
   }

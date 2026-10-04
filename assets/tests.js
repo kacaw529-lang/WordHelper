@@ -39,6 +39,21 @@
     check('解釋｜同音字視為正確', Matcher.scoreText(['在穴校讀書的人'], '在學校讀書的人。'), 100);
     check('解釋｜數字轉國字', Matcher.scoreText(['3個人'], '三個人'), 100);
 
+    /* 逐字標記沒念對的字 */
+    Matcher.setCharmap({ '學': 'ㄒㄩㄝˊ', '雪': 'ㄒㄩㄝˇ', '生': 'ㄕㄥ', '校': 'ㄒㄧㄠˋ', '穴': 'ㄒㄩㄝˊ' });
+    check('逐字｜詞語第一字念錯', JSON.stringify(Matcher.detailWord(['雪生'], '學生', 'ㄒㄩㄝˊ ㄕㄥ').hits), '[false,true]');
+    check('逐字｜解釋漏念「讀書」', JSON.stringify(Matcher.detailText(['在學校的人'], '在學校讀書的人。').hits), '[true,true,true,false,false,true,true]');
+    check('逐字｜同音字不算錯', JSON.stringify(Matcher.detailText(['在穴校'], '在學校').hits), '[true,true,true]');
+
+    /* 分句：依標點切開，太短的併入下一句 */
+    const segText = t => Matcher.segments(Matcher.tokens(t, '')).map(sg => sg.map(x => x.ch).join(''));
+    check('分句｜兩句', JSON.stringify(segText('學校結束一日課程後，放學生回家。')), JSON.stringify(['學校結束一日課程後，', '放學生回家。']));
+    check('分句｜太短併入下一句', JSON.stringify(segText('連詞。表示事情的原因。')), JSON.stringify(['連詞。表示事情的原因。']));
+    check('分句｜最後一句太短併回上一句', JSON.stringify(segText('他每天早上都去跑步，很好。')), JSON.stringify(['他每天早上都去跑步，很好。']));
+    check('分句｜沒有標點', JSON.stringify(segText('四維八德')), JSON.stringify(['四維八德']));
+    const tk = Matcher.tokens('8個人。', 'ㄅㄚ|ㄍㄜˋ|ㄖㄣˊ');
+    check('注音對位｜數字也有注音、標點沒有', tk.map(t => t.han ? t.zy : '-').join(','), 'ㄅㄚ,ㄍㄜˋ,ㄖㄣˊ,-');
+
     /* 朗讀用文字：破音字依詞語讀音代換 */
     Matcher.setCharmap({ '行': 'ㄏㄤˊ|ㄒㄧㄥˊ', '航': 'ㄏㄤˊ', '型': 'ㄒㄧㄥˊ', '銀': 'ㄧㄣˊ', '人': 'ㄖㄣˊ',
       '一': 'ㄧ|ㄧˊ|ㄧˋ', '衣': 'ㄧ', '學': 'ㄒㄩㄝˊ', '生': 'ㄕㄥ' });

@@ -28,6 +28,7 @@
         <h1>教師後臺</h1>
         <nav class="tabs" role="tablist" aria-label="後臺功能">
           <button class="tab-btn" role="tab" data-tab="logs" aria-selected="true">練習紀錄</button>
+          <button class="tab-btn" role="tab" data-tab="assign" aria-selected="false">指派生字</button>
           <button class="tab-btn" role="tab" data-tab="students" aria-selected="false">學生</button>
           <button class="tab-btn" role="tab" data-tab="words" aria-selected="false">詞語</button>
           <button class="tab-btn" role="tab" data-tab="settings" aria-selected="false">設定</button>
@@ -60,6 +61,33 @@
         </div>
       </div>
 
+      <div id="tab-assign" class="tab" role="tabpanel" hidden>
+        <p class="tab-note">指派期間內，學生首頁會出現這些生字，點一下就能開始練習。一個字在期間內累計完成「每次練習詞數」個詞語，就算完成。</p>
+        <form id="as-form" class="assign-form">
+          <input id="as-id" type="hidden">
+          <label>名稱<input id="as-title" class="input" type="text" maxlength="20" placeholder="例如：第五課"></label>
+          <label>生字<input id="as-chars" class="input as-chars" type="text" placeholder="例如：選擇遙控"></label>
+          <label>開始日期<input id="as-start" class="input" type="date"></label>
+          <label>結束日期<input id="as-end" class="input" type="date"></label>
+          <fieldset class="as-targets">
+            <legend>指派對象</legend>
+            <div id="as-targets"></div>
+          </fieldset>
+          <div class="row">
+            <button id="as-save" class="btn btn-primary" type="submit">新增指派</button>
+            <button id="as-cancel" class="btn btn-text" type="button" hidden>取消編輯</button>
+            <p id="as-msg" class="form-msg" aria-live="polite"></p>
+          </div>
+        </form>
+        <h2>指派清單</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>狀態</th><th>名稱</th><th>生字</th><th>期間</th><th>完成情形</th><th>操作</th></tr></thead>
+            <tbody id="as-body"></tbody>
+          </table>
+        </div>
+      </div>
+
       <div id="tab-students" class="tab" role="tabpanel" hidden>
         <p class="tab-note">每位學生有一條專屬連結，複製後傳給家長即可。學生只會看到「難度」不超過自己年級的詞語。按「換新連結」再儲存，舊連結就會失效。</p>
         <div class="table-wrap">
@@ -81,10 +109,10 @@
           <button class="btn btn-primary" type="submit">查詢</button>
           <p id="word-msg" class="form-msg" aria-live="polite"></p>
         </form>
-        <p class="tab-note">調整「難度」或勾選「封鎖」會立即生效。難度是匯入時依詞頻估算的，看到不適合的詞，直接調高難度或封鎖。</p>
+        <p class="tab-note">調整「難度」、勾選「封鎖」或填寫「老師解釋」都會立即生效。難度是匯入時依詞頻估算的，看到不適合的詞，直接調整或封鎖。「老師解釋」可以寫一句學生聽得懂的說明，學生端會優先顯示，並自動加上注音。</p>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th>詞語</th><th>注音</th><th>解釋</th><th>難度（適用年級）</th><th>封鎖</th></tr></thead>
+            <thead><tr><th>詞語</th><th>注音</th><th>辭典解釋</th><th>老師解釋</th><th>難度（適用年級）</th><th>封鎖</th></tr></thead>
             <tbody id="word-body"></tbody>
           </table>
         </div>

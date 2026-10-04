@@ -216,3 +216,47 @@ const Recorder = (() => {
 
   return { supported, start, stop, cancel, isRecording: () => !!mr };
 })();
+
+/* 提示音：開始收音的「嗶」、念對一句的「叮咚」。需在使用者點按後 unlock 一次 */
+const Cue = (() => {
+  let ctx = null;
+
+  function unlock() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ctx = ctx || new AC();
+      if (ctx.state === 'suspended') ctx.resume();
+    } catch (err) { ctx = null; }
+  }
+
+  function play(notes) {
+    if (!ctx) return Promise.resolve();
+    try {
+      let t = ctx.currentTime + 0.02;
+      notes.forEach(([freq, dur]) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.18, t + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + dur + 0.02);
+        t += dur * 0.85;
+      });
+      const total = notes.reduce((a, n) => a + n[1] * 0.85, 0);
+      return new Promise(r => setTimeout(r, total * 1000 + 60));
+    } catch (err) {
+      return Promise.resolve();
+    }
+  }
+
+  return {
+    unlock,
+    beep: () => play([[880, 0.12]]),
+    chime: () => play([[784, 0.14], [1047, 0.2]])
+  };
+})();

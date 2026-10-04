@@ -30,12 +30,17 @@
         <p id="hello" class="hello"></p>
         <h1 class="home-title">今天要練哪個生字？</h1>
       </header>
+      <section id="assign" class="assign" aria-labelledby="assign-title" hidden>
+        <h2 id="assign-title" class="assign-title">老師指派的生字</h2>
+        <div id="assign-list"></div>
+      </section>
       <form id="char-form" class="char-form" autocomplete="off" novalidate>
+        <p id="free-label" class="free-label">在格子裡打一個字</p>
         <label for="char-input" class="sr-only">輸入一個生字</label>
         <input id="char-input" class="char-input" type="text" inputmode="text" enterkeyhint="go"
                autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="字"
                aria-describedby="char-hint">
-        <p id="char-hint" class="hint" aria-live="polite">在格子裡打一個字</p>
+        <p id="char-hint" class="hint" aria-live="polite"></p>
         <button id="btn-start" class="btn btn-primary btn-wide" type="submit" disabled>開始練習</button>
       </form>
       <p id="mode-note" class="mode-note" hidden></p>
@@ -54,7 +59,7 @@
       <div class="stage">
         <p id="step-label" class="step-label"></p>
         <div id="word" class="word" role="img"></div>
-        <p id="definition" class="definition" hidden></p>
+        <div id="reading" class="reading" hidden></div>
       </div>
 
       <div class="dock">
@@ -87,6 +92,7 @@
       <h1 id="done-title" class="done-title">完成了！</h1>
       <p id="done-sub" class="done-sub"></p>
       <ol id="done-list" class="done-list"></ol>
+      <button id="btn-next-assign" class="btn btn-primary btn-wide" type="button" hidden></button>
       <button id="btn-again-char" class="btn btn-primary btn-wide" type="button">再練一個生字</button>
     </section>
   </main>
