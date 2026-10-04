@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>生字跟讀</title>
+  <meta name="theme-color" content="#EEF3E8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#21382C" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📗</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="student">
+  <div id="banner" class="banner" role="status" hidden></div>
+
+  <main id="app">
+    <section id="screen-loading" class="screen screen-center">
+      <p class="loading">準備中…</p>
+    </section>
+
+    <section id="screen-error" class="screen screen-center" hidden>
+      <p id="error-text" class="error-text"></p>
+      <button id="btn-retry" class="btn btn-ghost" type="button">重新整理</button>
+    </section>
+
+    <section id="screen-home" class="screen screen-home" hidden>
+      <header>
+        <p id="hello" class="hello"></p>
+        <h1 class="home-title">今天要練哪個生字？</h1>
+      </header>
+      <form id="char-form" class="char-form" autocomplete="off" novalidate>
+        <label for="char-input" class="sr-only">輸入一個生字</label>
+        <input id="char-input" class="char-input" type="text" inputmode="text" enterkeyhint="go"
+               autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="字"
+               aria-describedby="char-hint">
+        <p id="char-hint" class="hint" aria-live="polite">在格子裡打一個字</p>
+        <button id="btn-start" class="btn btn-primary btn-wide" type="submit" disabled>開始練習</button>
+      </form>
+      <p id="mode-note" class="mode-note" hidden></p>
+    </section>
+
+    <section id="screen-practice" class="screen screen-practice" hidden>
+      <header class="practice-head">
+        <button id="btn-home" class="btn btn-text" type="button">結束</button>
+        <div class="progress">
+          <span class="seed" aria-label="正在練習的生字"><span id="seed-char"></span></span>
+          <ol id="rounds" class="rounds" aria-label="練習進度"></ol>
+        </div>
+        <button id="btn-swap" class="btn btn-text" type="button">換一個詞</button>
+      </header>
+
+      <div class="stage">
+        <p id="step-label" class="step-label"></p>
+        <div id="word" class="word" role="img"></div>
+        <p id="definition" class="definition" hidden></p>
+      </div>
+
+      <div class="dock">
+        <p id="heard" class="heard" aria-live="polite"></p>
+        <p id="feedback" class="feedback" aria-live="assertive"></p>
+        <div id="self-check" class="self-check" hidden>
+          <button id="btn-again" class="btn btn-ghost" type="button">再念一次</button>
+          <button id="btn-ok" class="btn btn-primary" type="button">我念對了</button>
+        </div>
+        <div class="actions">
+          <button id="btn-listen" class="btn btn-round" type="button" aria-label="再聽一次">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 8.5a5 5 0 0 1 0 7" fill="none"/><path d="M18.5 6a8.5 8.5 0 0 1 0 12" fill="none"/></svg>
+            <span>再聽</span>
+          </button>
+          <button id="btn-mic" class="btn btn-mic" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none"/></svg>
+            <span id="mic-label">換我念</span>
+          </button>
+          <button id="btn-skip" class="btn btn-round is-hidden" type="button" aria-label="先跳過這個詞">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6l8 6-8 6zM15 6h3v12h-3z"/></svg>
+            <span>跳過</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="stamp" class="stamp" aria-hidden="true" hidden>讚</div>
+    </section>
+
+    <section id="screen-done" class="screen screen-done" hidden>
+      <h1 id="done-title" class="done-title">完成了！</h1>
+      <p id="done-sub" class="done-sub"></p>
+      <ol id="done-list" class="done-list"></ol>
+      <button id="btn-again-char" class="btn btn-primary btn-wide" type="button">再練一個生字</button>
+    </section>
+  </main>
+
+  <footer id="source" class="source"></footer>
+
+  <script src="assets/config.js"></script>
+  <script src="assets/api.js"></script>
+  <script src="assets/match.js"></script>
+  <script src="assets/speech.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

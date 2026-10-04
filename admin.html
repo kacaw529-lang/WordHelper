@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>教師後臺｜生字跟讀</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📗</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <main class="admin">
+    <section id="login" class="admin-login">
+      <h1>教師後臺</h1>
+      <form id="login-form">
+        <label for="pin" class="field-label">教師密碼</label>
+        <input id="pin" class="input" type="password" inputmode="numeric" autocomplete="current-password" required>
+        <button class="btn btn-primary" type="submit">登入</button>
+        <p id="login-msg" class="form-msg" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section id="panel" hidden>
+      <header class="admin-head">
+        <h1>教師後臺</h1>
+        <nav class="tabs" role="tablist" aria-label="後臺功能">
+          <button class="tab-btn" role="tab" data-tab="logs" aria-selected="true">練習紀錄</button>
+          <button class="tab-btn" role="tab" data-tab="students" aria-selected="false">學生</button>
+          <button class="tab-btn" role="tab" data-tab="words" aria-selected="false">詞語</button>
+          <button class="tab-btn" role="tab" data-tab="settings" aria-selected="false">設定</button>
+        </nav>
+        <button id="logout" class="btn btn-text" type="button">登出</button>
+      </header>
+
+      <div id="tab-logs" class="tab" role="tabpanel">
+        <form id="log-form" class="inline-form">
+          <label>從<input id="log-from" class="input" type="date"></label>
+          <label>到<input id="log-to" class="input" type="date"></label>
+          <label>學生<select id="log-student" class="input"><option value="">全部</option></select></label>
+          <button class="btn btn-primary" type="submit">查詢</button>
+          <p id="log-msg" class="form-msg" aria-live="polite"></p>
+        </form>
+        <h2>學生摘要</h2>
+        <p class="tab-note">正確率只計算「自動辨識」的紀錄；錄音自評與自評不列入平均，避免高估。</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>學生</th><th class="num">完成</th><th class="num">跳過</th><th class="num">換詞</th><th class="num">讀音平均</th><th class="num">解釋平均</th><th class="num">自動辨識比例</th><th>最近練習</th></tr></thead>
+            <tbody id="sum-body"></tbody>
+          </table>
+        </div>
+        <h2>練習明細</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>日期</th><th>時間</th><th>學生</th><th>生字</th><th>詞語</th><th>結果</th><th class="num">讀音</th><th class="num">解釋</th><th class="num">嘗試次數</th><th>驗證方式</th></tr></thead>
+            <tbody id="log-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="tab-students" class="tab" role="tabpanel" hidden>
+        <p class="tab-note">每位學生有一條專屬連結，複製後傳給家長即可。學生只會看到「難度」不超過自己年級的詞語。按「換新連結」再儲存，舊連結就會失效。</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>代號</th><th>暱稱</th><th>年級</th><th>啟用</th><th>專屬連結</th></tr></thead>
+            <tbody id="stu-body"></tbody>
+          </table>
+        </div>
+        <div class="row">
+          <button id="stu-add" class="btn btn-ghost" type="button">新增學生</button>
+          <button id="stu-save" class="btn btn-primary" type="button">儲存學生</button>
+          <p id="stu-msg" class="form-msg" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <div id="tab-words" class="tab" role="tabpanel" hidden>
+        <form id="word-form" class="inline-form">
+          <label>查詢生字<input id="word-char" class="input char-mini" type="text" autocomplete="off"></label>
+          <button class="btn btn-primary" type="submit">查詢</button>
+          <p id="word-msg" class="form-msg" aria-live="polite"></p>
+        </form>
+        <p class="tab-note">調整「難度」或勾選「封鎖」會立即生效。難度是匯入時依詞長、解釋長短和用字估算的，看到不適合的詞，直接調高難度或封鎖。</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>詞語</th><th>注音</th><th>解釋</th><th>難度（適用年級）</th><th>封鎖</th></tr></thead>
+            <tbody id="word-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="tab-settings" class="tab" role="tabpanel" hidden>
+        <form id="set-form" class="set-grid"></form>
+        <div class="row">
+          <button id="set-save" class="btn btn-primary" type="button">儲存設定</button>
+          <p id="set-msg" class="form-msg" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="assets/config.js"></script>
+  <script src="assets/api.js"></script>
+  <script src="assets/admin.js"></script>
+</body>
+</html>
