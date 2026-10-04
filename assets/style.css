@@ -356,4 +356,17 @@ svg path[fill="none"] { fill: none; }
 .set-grid small { color: var(--muted); }
 .inline-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; }
 .inline-form label { display: flex; flex-direction: column; gap: .25rem; font-size: .9rem; color: var(--muted); }
-.char-mini { width: 3.2rem; text-align: center; font: 400 1.6rem/1.2 var(--kai); }
+.char-mini {
+  width: 3.4rem;
+  height: 3.4rem;
+  padding: 0;
+  text-align: center;
+  font: 400 2.2rem/1 var(--kai);
+  border: 2px solid var(--grid);
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(to bottom, var(--grid-soft) 0 4px, transparent 4px 8px) center / 1.5px 100% no-repeat,
+    repeating-linear-gradient(to right, var(--grid-soft) 0 4px, transparent 4px 8px) center / 100% 1.5px no-repeat,
+    var(--paper);
+}
+.inline-form .btn { height: 2.9rem; }

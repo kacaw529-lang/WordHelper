@@ -306,14 +306,14 @@
     }
   }
 
-  /* 隨機排序，但兩個字的詞優先 */
+  /* 伺服器已隨機抽樣，這裡再洗牌一次 */
   function arrange(words) {
     const a = words.slice();
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [a[i], a[j]] = [a[j], a[i]];
     }
-    return a.sort((x, y) => Array.from(x.w).length - Array.from(y.w).length);
+    return a;
   }
 
   function stopAll() {
@@ -365,8 +365,10 @@
   function playCurrent() {
     const w = S.cur.w;
     const rate = S.settings.rate;
-    if (S.step === 'word' && w.audio) return Speaker.playUrl(w.audio).catch(() => Speaker.speak(w.w, rate));
-    return Speaker.speak(S.step === 'word' ? w.w : w.d, rate);
+    // 朗讀用文字：破音字換成同音字，確保念出詞語標示的讀音（畫面文字不變）
+    const spokenWord = Matcher.ttsText(w.w, w.w, w.z);
+    if (S.step === 'word' && w.audio) return Speaker.playUrl(w.audio).catch(() => Speaker.speak(spokenWord, rate));
+    return Speaker.speak(S.step === 'word' ? spokenWord : Matcher.ttsText(w.d, w.w, w.z), rate);
   }
 
   const passLine = () => (S.step === 'word' ? S.settings.wordPass : S.settings.defPass);
