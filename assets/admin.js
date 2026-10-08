@@ -40,8 +40,9 @@
     $('log-to').value = DateTW.today();
     $('log-from').value = DateTW.addDays(DateTW.today(), -6);
     resetAssignForm();
+    await loadAssignments();
+    fillScope(true);
     loadLogs();
-    loadAssignments();
   }
 
   $('login-form').addEventListener('submit', async e => {
@@ -310,6 +311,7 @@
       });
       assignments = data.assignments;
       renderAssignments();
+      fillScope(false);
       resetAssignForm();
       msg('as-msg', '已儲存指派');
     } catch (err) {
@@ -351,6 +353,7 @@
           const data = await call('adminDeleteAssignment', { id: a.id });
           assignments = data.assignments;
           renderAssignments();
+          fillScope(false);
         } catch (err) {
           msg('as-msg', err.message, true);
         }
@@ -368,19 +371,73 @@
 
   /* ───────── 紀錄 ───────── */
 
+  const setting = (k, def) => {
+    const d = settings.find(x => x.key === k);
+    return d && d.value !== undefined && d.value !== '' ? d.value : def;
+  };
+  let report = null;
+  let range = { from: '', to: '', title: '' };
+
+  /* 範圍：進行中的指派排最前面，最後是「依日期查詢」 */
+  function fillScope(pickDefault) {
+    const sel = $('log-scope');
+    const keep = sel.value;
+    const rank = { '進行中': 0, '尚未開始': 1, '已結束': 2 };
+    const list = assignments.slice().sort((x, y) => (rank[x.status] - rank[y.status]) || DateTW.normalize(y.start).localeCompare(DateTW.normalize(x.start)));
+    sel.innerHTML = '';
+    list.forEach(a => sel.append(el('option', { value: a.id, textContent: a.title + '（' + md(a.start) + '～' + md(a.end) + '，' + a.status + '）' })));
+    sel.append(el('option', { value: 'date', textContent: '依日期查詢' }));
+    const live = list.find(a => a.status === '進行中');
+    if (!pickDefault && Array.from(sel.options).some(o => o.value === keep)) sel.value = keep;
+    else sel.value = live ? live.id : 'date';
+    $('log-dates').hidden = sel.value !== 'date';
+  }
+
+  $('log-scope').addEventListener('change', () => {
+    $('log-dates').hidden = $('log-scope').value !== 'date';
+    loadLogs();
+  });
+  $('log-student').addEventListener('change', () => loadLogs());
   $('log-form').addEventListener('submit', e => { e.preventDefault(); loadLogs(); });
 
   async function loadLogs() {
-    const from = DateTW.normalize($('log-from').value);
-    const to = DateTW.normalize($('log-to').value);
-    if (from && to && from > to) return msg('log-msg', '開始日期不能晚於結束日期', true);
+    const a = assignments.find(x => x.id === $('log-scope').value);
+    let from, to;
+    if (a) {
+      from = DateTW.normalize(a.start);
+      to = DateTW.normalize(a.end);
+    } else {
+      from = DateTW.normalize($('log-from').value);
+      to = DateTW.normalize($('log-to').value);
+      if (from && to && from > to) return msg('log-msg', '開始日期不能晚於結束日期', true);
+    }
+    const who = $('log-student').value;
     msg('log-msg', '查詢中…');
     try {
-      const data = await call('adminLogs', { from, to, student: $('log-student').value });
-      const rows = data.rows.map(r => Object.assign(r, { date: DateTW.normalize(r.date) }));
-      renderSummary(rows);
-      renderLogs(rows);
-      msg('log-msg', '共 ' + rows.length + ' 筆');
+      const data = await call('adminLogs', { from, to, student: who });
+      const targets = a ? a.targets : null;
+      const roster = students
+        .filter(s => s.enabled !== false)
+        .filter(s => !targets || targets.includes('全部') || targets.includes(s.id))
+        .filter(s => !who || s.id === who)
+        .map(s => ({ id: s.id, name: s.name || s.id }));
+      report = Report.build(data.rows, {
+        students: roster,
+        chars: a ? Array.from(a.chars) : null,
+        mode: a ? 'assign' : 'date',
+        need: Number(setting('rounds', 3)),
+        defPass: Number(setting('defPass', 80)),
+        skipAfter: Number(setting('skipAfter', 3)),
+        includeOthers: !a
+      });
+      range = { from, to, title: a ? a.title : '' };
+      closeCellDetail();
+      renderMatrix();
+      renderAttention();
+      renderSummary(report.records);
+      renderDetails();
+      const cut = data.rows.length >= 3000 ? '（只顯示最近 3000 筆，請縮小範圍）' : '';
+      msg('log-msg', (a ? '' : md(from) + '～' + md(to) + '，') + '共 ' + report.records.length + ' 筆' + cut, !!cut);
     } catch (err) {
       msg('log-msg', err.message, true);
     }
@@ -392,6 +449,166 @@
   };
   const avg = a => (a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null);
   const show = v => (v === null || v === undefined || v === '' ? '—' : String(v));
+  const shortStamp = st => {
+    const [d, t] = String(st || '').split(' ');
+    return d ? md(d) + ' ' + String(t || '').slice(0, 5) : '';
+  };
+
+  /* ── 第一層：進度矩陣 ── */
+
+  function renderMatrix() {
+    const table = $('matrix');
+    table.innerHTML = '';
+    const rp = report;
+    const need = Number(setting('rounds', 3));
+    if (!rp.cols.length || !rp.matrix.length) {
+      table.append(el('tbody', {}, [el('tr', {}, [el('td', { className: 'empty', textContent: rp.matrix.length ? '這段期間沒有練習紀錄' : '沒有符合的學生' })])]));
+      return;
+    }
+    const head = el('tr', {}, [el('th', { className: 'mx-name', textContent: '學生' })]);
+    rp.cols.forEach(c => head.append(el('th', { className: 'mx-col' + (c === Report.OTHER ? ' mx-other' : ' kai'), textContent: c === Report.OTHER ? '自選' : c, title: c === Report.OTHER ? '不在這次指派裡的生字' : '' })));
+    head.append(el('th', { className: 'num mx-total', textContent: '完成' }));
+    table.append(el('thead', {}, [head]));
+
+    const body = el('tbody');
+    rp.matrix.forEach(m => {
+      const tr = el('tr', {}, [el('th', { className: 'mx-name', scope: 'row', textContent: m.name })]);
+      rp.cols.forEach(c => {
+        const cell = m.cells[c];
+        const isOther = c === Report.OTHER;
+        let main;
+        let sub = '';
+        if (cell.status === 'done') main = isOther ? cell.done + ' 詞' : '✔';
+        else if (cell.status === 'partial') main = isOther ? cell.done + ' 詞' : cell.done + '／' + need;
+        else main = '·';
+        if (cell.status !== 'none') sub = cell.selfOnly ? '自評' : (cell.def !== null ? String(cell.def) : '');
+        const label = m.name + '，' + (isOther ? '自選生字' : '「' + c + '」') + '：' +
+          (cell.status === 'done' ? '完成' : cell.status === 'partial' ? '完成 ' + cell.done + ' 個詞' : '還沒練習') +
+          (cell.def !== null ? '，解釋平均 ' + cell.def + ' 分' : '') +
+          (cell.skip ? '，跳過 ' + cell.skip + ' 次' : '') + (cell.selfOnly ? '，未經辨識' : '');
+        const btn = el('button', {
+          type: 'button',
+          className: 'mx-cell is-' + cell.status + (cell.warn ? ' is-warn' : '') + (cell.low ? ' is-low' : '') + (cell.selfOnly ? ' is-self' : ''),
+          disabled: !cell.records.length,
+          title: label
+        }, [el('span', { className: 'm', textContent: main }), el('span', { className: 's', textContent: sub })]);
+        btn.setAttribute('aria-label', label);
+        btn.setAttribute('aria-expanded', 'false');
+        btn.addEventListener('click', () => toggleCellDetail(btn, m.name + '・' + (isOther ? '自選生字' : '「' + c + '」'), cell.records, false));
+        tr.append(el('td', { className: 'mx' }, [btn]));
+      });
+      tr.append(el('td', { className: 'num mx-total', textContent: m.charsDone + '／' + rp.chars.length + ' 字' }));
+      body.append(tr);
+    });
+    table.append(body);
+
+    const foot = el('tr', {}, [el('th', { className: 'mx-name', scope: 'row', textContent: '全班' })]);
+    rp.cols.forEach(c => {
+      const k = rp.classRow[c];
+      const isOther = c === Report.OTHER;
+      const main = isOther ? k.records.filter(r => r.result === '完成').length + ' 詞' : k.done + '／' + k.total;
+      const sub = k.def !== null ? String(k.def) : '';
+      const label = '全班' + (isOther ? '自選生字' : '「' + c + '」') + '：' + (isOther ? main : k.done + ' 人完成') +
+        (k.def !== null ? '，解釋平均 ' + k.def + ' 分' : '') + (k.skip ? '，跳過 ' + k.skip + ' 次' : '');
+      const btn = el('button', {
+        type: 'button',
+        className: 'mx-cell mx-class' + (k.warn ? ' is-warn' : '') + (k.low ? ' is-low' : '') + (!isOther && k.total && k.done === k.total ? ' is-all' : ''),
+        disabled: !k.records.length,
+        title: label
+      }, [el('span', { className: 'm', textContent: main }), el('span', { className: 's', textContent: sub })]);
+      btn.setAttribute('aria-label', label);
+      btn.setAttribute('aria-expanded', 'false');
+      btn.addEventListener('click', () => toggleCellDetail(btn, '全班・' + (isOther ? '自選生字' : '「' + c + '」'), k.records, true));
+      foot.append(el('td', { className: 'mx' }, [btn]));
+    });
+    const allDone = rp.matrix.filter(m => rp.chars.length && m.charsDone === rp.chars.length).length;
+    foot.append(el('td', { className: 'num mx-total', textContent: allDone + '／' + rp.matrix.length + ' 人' }));
+    table.append(el('tfoot', {}, [foot]));
+  }
+
+  let openCell = null;
+
+  function closeCellDetail() {
+    if (openCell) openCell.setAttribute('aria-expanded', 'false');
+    openCell = null;
+    $('cell-detail').hidden = true;
+    $('cell-detail').innerHTML = '';
+  }
+
+  function toggleCellDetail(btn, title, records, withStudent) {
+    if (openCell === btn) return closeCellDetail();
+    closeCellDetail();
+    openCell = btn;
+    btn.setAttribute('aria-expanded', 'true');
+    const box = $('cell-detail');
+    const close = el('button', { className: 'btn btn-text', type: 'button', textContent: '收起' });
+    close.addEventListener('click', closeCellDetail);
+    const head = ['日期', '時間'].concat(withStudent ? ['學生'] : [], ['生字', '詞語', '結果', '讀音', '解釋', '嘗試', '驗證方式']);
+    const tbody = el('tbody');
+    records.forEach(r => tbody.append(recordRow(r, withStudent)));
+    box.append(
+      el('div', { className: 'cd-head' }, [el('h3', { textContent: title }), close]),
+      el('div', { className: 'table-wrap' }, [el('table', { className: 'table' }, [
+        el('thead', {}, [el('tr', {}, head.map(h => el('th', { className: ['讀音', '解釋', '嘗試'].includes(h) ? 'num' : '', textContent: h })))]),
+        tbody
+      ])])
+    );
+    box.hidden = false;
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  function resultTag(r) {
+    return el('span', { className: 'tag' + (r.result === '跳過' ? ' tag-red' : r.result === '換詞' ? ' tag-muted' : ''), textContent: r.result });
+  }
+
+  function recordRow(r, withStudent) {
+    const cells = [el('td', { textContent: r.date }), el('td', { textContent: r.time })];
+    if (withStudent) cells.push(el('td', { textContent: nameOf(r.student) }));
+    cells.push(
+      el('td', { className: 'kai', textContent: r.char }),
+      el('td', { className: 'kai', textContent: r.word }),
+      el('td', {}, [resultTag(r)]),
+      el('td', { className: 'num', textContent: show(r.wordScore) }),
+      el('td', { className: 'num', textContent: show(r.defScore) }),
+      el('td', { className: 'num', textContent: show(r.wordTries) + '／' + show(r.defTries) }),
+      el('td', { className: r.method === '自動辨識' ? '' : 'warn-text', textContent: r.method })
+    );
+    return el('tr', {}, cells);
+  }
+
+  /* ── 第二層：需要注意 ── */
+
+  function renderAttention() {
+    const body = $('att-body');
+    body.innerHTML = '';
+    const list = report.attention;
+    $('att-count').textContent = list.length ? list.length + ' 項' : '';
+    if (!list.length) {
+      body.append(el('tr', {}, [el('td', { colSpan: 6, className: 'empty', textContent: '目前沒有需要注意的紀錄' })]));
+      return;
+    }
+    const tone = { skip: ' tag-red', device: ' tag-red', start: ' tag-muted', tries: '', swap: '' };
+    list.slice(0, 200).forEach(it => {
+      body.append(el('tr', {}, [
+        el('td', { textContent: it.name }),
+        el('td', {}, [el('span', { className: 'tag' + (tone[it.kind] || ''), textContent: it.label })]),
+        el('td', { className: 'kai', textContent: it.char || '' }),
+        el('td', { className: 'kai', textContent: it.word || '' }),
+        el('td', { className: 'wrap' }, attText(it)),
+        el('td', { textContent: shortStamp(it.last) })
+      ]));
+    });
+  }
+
+  function attText(it) {
+    if (!it.records || !it.records.length) return [it.text];
+    const btn = el('button', { className: 'btn btn-text btn-inline', type: 'button', textContent: '查看' });
+    btn.setAttribute('aria-expanded', 'false');
+    btn.addEventListener('click', () => toggleCellDetail(btn, it.name + '・念了較多次的詞', it.records, false));
+    return [it.text + ' ', btn];
+  }
+
+  /* ── 學生摘要 ── */
 
   function renderSummary(rows) {
     const by = {};
@@ -413,47 +630,91 @@
     });
     const body = $('sum-body');
     body.innerHTML = '';
-    const ids = Object.keys(by).sort();
+    const ids = report.matrix.map(m => m.id).filter(id => by[id]);
     if (!ids.length) {
-      body.append(el('tr', {}, [el('td', { colSpan: 8, textContent: '這段期間沒有練習紀錄' })]));
+      body.append(el('tr', {}, [el('td', { colSpan: 8, className: 'empty', textContent: '這段期間沒有練習紀錄' })]));
       return;
     }
     ids.forEach(id => {
       const g = by[id];
       const w = avg(g.ws);
       const d = avg(g.ds);
+      const autoRate = g.total ? Math.round(g.auto / g.total * 100) : null;
       body.append(el('tr', {}, [
         el('td', { textContent: nameOf(id) }),
         el('td', { className: 'num', textContent: g.done }),
-        el('td', { className: 'num', textContent: g.skip }),
+        el('td', { className: 'num' + (g.skip ? ' warn-text' : ''), textContent: g.skip }),
         el('td', { className: 'num', textContent: g.swap }),
         el('td', { className: 'num', textContent: w === null ? '—' : w + ' 分' }),
         el('td', { className: 'num', textContent: d === null ? '—' : d + ' 分' }),
-        el('td', { className: 'num', textContent: g.total ? Math.round(g.auto / g.total * 100) + '%' : '—' }),
+        el('td', { className: 'num' + (autoRate !== null && autoRate < 50 ? ' warn-text' : ''), textContent: autoRate === null ? '—' : autoRate + '%' }),
         el('td', { textContent: g.last.slice(0, 16) })
       ]));
     });
   }
 
-  function renderLogs(rows) {
-    const body = $('log-body');
-    body.innerHTML = '';
-    rows.slice(0, 500).forEach(r => {
-      const result = el('span', { className: 'tag' + (r.result === '跳過' ? ' tag-red' : ''), textContent: r.result });
-      body.append(el('tr', {}, [
-        el('td', { textContent: r.date }),
-        el('td', { textContent: r.time }),
-        el('td', { textContent: nameOf(r.student) }),
-        el('td', { className: 'kai', textContent: r.char }),
-        el('td', { className: 'kai', textContent: r.word }),
-        el('td', {}, [result]),
-        el('td', { className: 'num', textContent: show(r.wordScore) }),
-        el('td', { className: 'num', textContent: show(r.defScore) }),
-        el('td', { className: 'num', textContent: show(r.wordTries) + '／' + show(r.defTries) }),
-        el('td', { textContent: r.method })
+  /* ── 第三層：依學生分組的明細 ── */
+
+  function renderDetails() {
+    const box = $('det-list');
+    box.innerHTML = '';
+    const gs = report.groups;
+    $('det-toggle').textContent = '全部展開';
+    $('det-toggle').hidden = !gs.length;
+    $('det-csv').disabled = !report.records.length;
+    if (!gs.length) {
+      box.append(el('p', { className: 'tab-note', textContent: '這段期間沒有練習紀錄' }));
+      return;
+    }
+    gs.forEach(g => {
+      const m = report.matrix.find(x => x.id === g.id);
+      const meta = g.rows.length + ' 筆・完成 ' + g.done + ' 個詞' +
+        (m && report.chars.length ? '、' + m.charsDone + '／' + report.chars.length + ' 個字' : '') +
+        '・最近 ' + shortStamp(g.last);
+      const tbody = el('tbody');
+      g.rows.forEach(r => {
+        tbody.append(el('tr', { className: (r.newDate ? 'grp-date' : r.newChar ? 'grp-char' : '') }, [
+          el('td', { className: 'muted-cell', textContent: r.newDate ? md(r.date) : '' }),
+          el('td', { className: 'kai', textContent: r.newChar ? r.char : '' }),
+          el('td', { className: 'kai', textContent: r.word }),
+          el('td', {}, [resultTag(r)]),
+          el('td', { className: 'num', textContent: show(r.wordScore) }),
+          el('td', { className: 'num', textContent: show(r.defScore) }),
+          el('td', { className: 'num', textContent: show(r.wordTries) + '／' + show(r.defTries) }),
+          el('td', { className: r.method === '自動辨識' ? '' : 'warn-text', textContent: r.method }),
+          el('td', { className: 'muted-cell', textContent: r.time.slice(0, 5) })
+        ]));
+      });
+      const table = el('table', { className: 'table det-table' }, [
+        el('thead', {}, [el('tr', {}, ['日期', '生字', '詞語', '結果', '讀音', '解釋', '嘗試', '驗證方式', '時間']
+          .map(h => el('th', { className: ['讀音', '解釋', '嘗試'].includes(h) ? 'num' : '', textContent: h })))]),
+        tbody
+      ]);
+      box.append(el('details', { className: 'det' }, [
+        el('summary', {}, [el('span', { className: 'det-name', textContent: g.name }), el('span', { className: 'det-meta', textContent: meta })]),
+        el('div', { className: 'table-wrap' }, [table])
       ]));
     });
   }
+
+  $('det-toggle').addEventListener('click', () => {
+    const all = Array.from(document.querySelectorAll('#det-list details'));
+    const open = !all.every(d => d.open);
+    all.forEach(d => { d.open = open; });
+    $('det-toggle').textContent = open ? '全部收合' : '全部展開';
+  });
+
+  $('det-csv').addEventListener('click', () => {
+    if (!report || !report.records.length) return;
+    const csv = Report.toCSV(report.records, nameOf);
+    const name = '練習紀錄_' + (range.title ? range.title + '_' : '') + (range.from || '') + '_' + (range.to || '') + '.csv';
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = el('a', { href: url, download: name.replace(/[\\/:*?"<>|]/g, '') });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
 
   /* 重新整理時自動登入 */
   if (PIN) login(PIN).catch(() => { PIN = ''; });

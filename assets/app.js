@@ -17,7 +17,7 @@
     char: '', queue: [], round: 0, results: [],
     cur: null, step: 'word',
     segs: [], segIdx: 0, segScores: [],   // 第二關：分句跟讀
-    tries: 0, best: 0,                     // tries：這一關累計嘗試；best：目前這一句（或詞語）的最高分
+    tries: 0, best: 0, stepTries: 0,       // tries：目前這一句（或詞語）的嘗試次數；stepTries：這一關最難的一句念了幾次；best：目前這一句的最高分
     token: 0, listening: false, recording: false, micGranted: false, prompted: false,
     session: '', seq: 0, busy: false, composing: false
   };
@@ -520,6 +520,7 @@
     stopAll();
     S.step = step;
     S.tries = 0;
+    S.stepTries = 0;
     S.best = 0;
     S.segIdx = 0;
     S.segScores = [];
@@ -701,6 +702,8 @@
       await Cue.chime();
       if (token !== S.token) return;
       S.segIdx++;
+      S.stepTries = Math.max(S.stepTries, S.tries); // 每一句重新計算嘗試次數，「先跳過」才不會因為句數多而提早出現
+      S.tries = 0;
       S.best = 0;
       renderSegments();
       setHeard('');
@@ -712,8 +715,9 @@
 
   async function passStage(score) {
     const c = S.cur;
-    if (S.step === 'word') { c.wordScore = score; c.wordTries = S.tries; }
-    else { c.defScore = averageScore(S.segScores); c.defTries = S.tries; }
+    const used = Math.max(S.stepTries, S.tries);
+    if (S.step === 'word') { c.wordScore = score; c.wordTries = used; }
+    else { c.defScore = averageScore(S.segScores); c.defTries = used; }
     setControls('locked');
     if (S.step === 'def') S.segs.forEach(s => { s.el.classList.add('is-done'); s.el.classList.remove('is-current'); });
     setFeedback(S.step === 'word' ? '念對了！接下來念' + stageTwoLabel() + '。' : '太棒了！', 'good');
@@ -739,13 +743,14 @@
   }
 
   function snapshotStep() {
-    const auto = S.mode === 'auto' && S.tries > 0;
+    const used = Math.max(S.stepTries, S.tries);
     if (S.step === 'word') {
-      S.cur.wordScore = auto ? S.best : '';
-      S.cur.wordTries = S.tries;
+      S.cur.wordScore = S.mode === 'auto' && S.tries > 0 ? S.best : '';
+      S.cur.wordTries = used;
     } else {
-      S.cur.defScore = auto ? averageScore(S.segScores.concat([S.best])) : '';
-      S.cur.defTries = S.tries;
+      const scores = S.segScores.concat(S.tries > 0 ? [S.best] : []);
+      S.cur.defScore = S.mode === 'auto' ? averageScore(scores) : '';
+      S.cur.defTries = used;
     }
   }
 

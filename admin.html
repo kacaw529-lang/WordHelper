@@ -38,12 +38,39 @@
 
       <div id="tab-logs" class="tab" role="tabpanel">
         <form id="log-form" class="inline-form">
-          <label>從<input id="log-from" class="input" type="date"></label>
-          <label>到<input id="log-to" class="input" type="date"></label>
+          <label>範圍<select id="log-scope" class="input"></select></label>
+          <span id="log-dates" class="log-dates">
+            <label>從<input id="log-from" class="input" type="date"></label>
+            <label>到<input id="log-to" class="input" type="date"></label>
+          </span>
           <label>學生<select id="log-student" class="input"><option value="">全部</option></select></label>
           <button class="btn btn-primary" type="submit">查詢</button>
           <p id="log-msg" class="form-msg" aria-live="polite"></p>
         </form>
+
+        <div class="report-head">
+          <h2>進度總覽</h2>
+          <ul class="legend" aria-label="圖例">
+            <li><span class="lg lg-done">✔</span>完成</li>
+            <li><span class="lg lg-part">1／3</span>進行中</li>
+            <li><span class="lg lg-warn"></span>有跳過</li>
+            <li><span class="lg lg-self">自評</span>未經辨識</li>
+          </ul>
+        </div>
+        <p class="tab-note">格子下方的數字是解釋跟讀的平均分數（只算自動辨識）。點一下格子可以看這個字的練習明細；點最下面「全班」那一列，可以看全班練這個字的情形。</p>
+        <div class="table-wrap mx-wrap">
+          <table id="matrix" class="table matrix"></table>
+        </div>
+        <section id="cell-detail" class="cell-detail" aria-live="polite" hidden></section>
+
+        <h2>需要注意 <span id="att-count" class="h-count"></span></h2>
+        <div class="table-wrap">
+          <table class="table att-table">
+            <thead><tr><th>學生</th><th>狀況</th><th>生字</th><th>詞語</th><th>說明</th><th>時間</th></tr></thead>
+            <tbody id="att-body"></tbody>
+          </table>
+        </div>
+
         <h2>學生摘要</h2>
         <p class="tab-note">正確率只計算「自動辨識」的紀錄；錄音自評與自評不列入平均，避免高估。</p>
         <div class="table-wrap">
@@ -52,13 +79,16 @@
             <tbody id="sum-body"></tbody>
           </table>
         </div>
-        <h2>練習明細</h2>
-        <div class="table-wrap">
-          <table class="table">
-            <thead><tr><th>日期</th><th>時間</th><th>學生</th><th>生字</th><th>詞語</th><th>結果</th><th class="num">讀音</th><th class="num">解釋</th><th class="num">嘗試次數</th><th>驗證方式</th></tr></thead>
-            <tbody id="log-body"></tbody>
-          </table>
+
+        <div class="report-head">
+          <h2>練習明細</h2>
+          <div class="row-tight">
+            <button id="det-toggle" class="btn btn-text" type="button">全部展開</button>
+            <button id="det-csv" class="btn btn-ghost btn-sm" type="button">下載 CSV</button>
+          </div>
         </div>
+        <p class="tab-note">「嘗試」是「詞語／解釋」各念了幾次才通過；解釋分句跟讀時，算的是最難的那一句。</p>
+        <div id="det-list" class="det-list"></div>
       </div>
 
       <div id="tab-assign" class="tab" role="tabpanel" hidden>
@@ -130,6 +160,7 @@
 
   <script src="assets/config.js"></script>
   <script src="assets/api.js"></script>
+  <script src="assets/report.js"></script>
   <script src="assets/admin.js"></script>
 </body>
 </html>
