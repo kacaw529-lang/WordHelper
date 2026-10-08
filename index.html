@@ -147,6 +147,8 @@ textarea:focus{border-color:var(--c);outline:none}
 .lab-q{font-size:15px;color:var(--ink-soft)}
 
 /* 鼓勵泡泡 */
+body.typing{padding-bottom:60vh}
+body.typing .toasts{bottom:auto;top:calc(12px + env(safe-area-inset-top,0px))}
 .toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;align-items:center;z-index:20;width:min(92vw,520px);pointer-events:none}
 .toast{background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:999px;font-size:17px;box-shadow:0 6px 20px rgba(0,0,0,.18);animation:pop .35s ease-out;text-align:center}
 @keyframes pop{from{transform:translateY(16px) scale(.9);opacity:0}to{transform:none;opacity:1}}
@@ -220,7 +222,6 @@ const MODES = {
     label:'敘事', icon:'📖', hint:'寫一件發生過的事', sheetTitle:'我的 ORID 短文',
     intro:'跟著四個步驟，一次只想一件事。寫完以後，AI 老師會幫你把句子接起來，你再把它抄到作業簿上。',
     firstToast:'新的一篇開始囉！先寫你看到了什麼。',
-    lead:{ o:'今天', r:'當時', i:'我發現', d:'所以' },
     steps:[
       { key:'o', letter:'O', name:'看到', title:'我看到了什麼？',
         sub:'像照相機一樣，把看到、聽到、做過的事情寫下來。',
@@ -253,7 +254,6 @@ const MODES = {
     label:'感謝', icon:'💌', hint:'寫這週想說謝謝的事', sheetTitle:'我的感謝小短文',
     intro:'先想一想這一週，誰幫過你、對你好？可能有好幾件，請挑一件「最想說謝謝」的來寫。家人、同學、老師、鄰居、寵物，甚至是自己都可以喔！',
     firstToast:'感謝小短文開始囉！先想想這週誰幫了你。',
-    lead:{ o:'這個星期', r:'那時候', i:'多虧了', d:'所以' },
     steps:[
       { key:'o', letter:'O', name:'發生', title:'誰幫了我？發生什麼事？',
         sub:'挑一件最想說謝謝的事，像照相機一樣把經過寫下來。寫稱呼就好（媽媽、阿嬤、同學小安），不用寫全名。',
@@ -380,7 +380,7 @@ function renderStep(idx){
       <div><p class="step-no">第 ${idx + 1} 步／共 4 步</p><h2>${s.title}</h2><p class="sub">${s.sub}</p></div></div>
     <ul class="qs">${s.qs.map(q => `<li>${q}</li>`).join('')}</ul>
     <div class="chiprow"><span class="lab">開頭可以這樣寫</span>${s.starters.map(w => `<button type="button" class="chip" data-ins="${w}">${w}…</button>`).join('')}</div>
-    <div class="chiprow"><span class="lab">連接詞</span>${s.conns.map(w => `<button type="button" class="chip conn" data-ins="${w}，" data-conn="${w}">${w}</button>`).join('')}</div>
+    <div class="chiprow conn-row"><span class="lab">連接詞</span>${s.conns.map(w => `<button type="button" class="chip conn" data-ins="${w}，" data-conn="${w}">${w}</button>`).join('')}</div>
     ${s.moods ? `<div class="chiprow"><span class="lab">心情詞</span>${s.moods.map(w => `<button type="button" class="chip mood" data-ins="${w}">${w}</button>`).join('')}</div>` : ''}
     <label class="sub" for="ta">寫在這裡：</label>
     <textarea id="ta" data-k="${s.key}" placeholder="${s.starters[0]}……">${esc(draft[s.key])}</textarea>
@@ -410,7 +410,7 @@ function show(p){
   const stage = $('#stage');
   stage.innerHTML = cur === 0 ? renderWelcome() : cur === LAST ? renderFinish() : renderStep(cur - 1);
   renderRail();
-  if (cur >= 1 && cur <= 4){ updateCount(STEPS[cur - 1].key, true); const ta = $('#ta'); ta.focus({preventScroll:true}); }
+  if (cur >= 1 && cur <= 4){ updateCount(STEPS[cur - 1].key, true); if (!IS_TOUCH) $('#ta').focus({ preventScroll:true }); }
   if (cur === LAST && lastResult) renderResult(lastResult);
   window.scrollTo({ top:0, behavior:'smooth' });
   if (cur > 0) save();
@@ -444,17 +444,56 @@ function callServer(input){
     google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).polish(input);
   });
 }
+/* 基本版（AI 沒連上時）：標出孩子自己用的連接詞；真的沒有，才補一個放在哪都通順的詞 */
+const SAFE_LEAD = {
+  // O 是第一段，不需要承接上文，所以不補
+  story:  { o:'', r:'那時候', i:'後來我想到', d:'所以' },
+  thanks: { o:'', r:'那時候', i:'後來我想到', d:'所以' }
+};
+const SKIP_LEAD = {   // 開頭已經是這些詞，就不要再補
+  o:/^(今天|昨天|前天|這個?星期|上個?星期|這週|上週|星期|禮拜|那天|有一天|早上|中午|下午|晚上|放學|上課|下課|週末|假日|暑假|寒假|[0-9０-９一二三四五六七八九十]+月)/,
+  r:/^(當時|那時|這時|聽到|看到)/,
+  i:/^(我發現|我想到|我覺得|我明白|我學到|我知道|原來|因為|如果|要不是|幸好)/,
+  d:/^(以後|下次|我決定|我要|我會|我想|我希望|謝謝|從今天|所以|因此)/
+};
+function markConns(t, max){
+  const taken = [];
+  for (const c of ALL_CONNS){            // ALL_CONNS 已依長度排序，長詞優先
+    if (taken.length >= max) break;
+    let from = 0, i;
+    while ((i = t.indexOf(c, from)) >= 0){
+      if (!taken.some(([a, b]) => i < b && i + c.length > a)){ taken.push([i, i + c.length]); break; }
+      from = i + 1;
+    }
+  }
+  taken.sort((x, y) => y[0] - x[0]);
+  taken.forEach(([a, b]) => { t = t.slice(0, a) + '【' + t.slice(a, b) + '】' + t.slice(b); });
+  return t;
+}
 function polishBasic(input){
   const fix = s => { s = String(s || '').trim().replace(/\s+/g, '').replace(/,/g, '，'); if (s && !/[。！？!?]$/.test(s)) s += '。'; return s; };
-  const lead = MODES[mode].lead;
   const out = { source:'basic', praise:'你把四個步驟都寫完了，好有毅力！👏', tip:'抄寫時，試著把有顏色的連接詞唸出聲音。' };
   STEPS.forEach(s => {
-    let t = fix(input[s.key]);
-    const has = ALL_CONNS.find(c => t.startsWith(c));
-    out[s.key] = has ? `【${has}】` + t.slice(has.length) : `【${lead[s.key]}】` + (s.key === 'i' ? '' : '，') + t;
+    const t = fix(input[s.key]);
+    let m = markConns(t, 2);
+    const lead = SAFE_LEAD[mode][s.key];
+    if (lead && !m.includes('【') && !SKIP_LEAD[s.key].test(t)) m = `【${lead}】，` + t;
+    out[s.key] = m;
   });
   return out;
 }
+
+/* 整理結果的最後檢查：去掉重複或疊在一起的連接詞 */
+function tidyConn(text){
+  let t = String(text || '');
+  for (let k = 0; k < 3; k++){
+    t = t.replace(/【([^【】]{1,10})】[，,、]?\s*\1/g, '【$1】')                 // 【今天】，今天 → 【今天】
+         .replace(/([^【】\s]{1,10})[，,]?【\1】/g, '【$1】')                     // 今天【今天】 → 【今天】
+         .replace(/【([^【】]{1,10})】[，,、]?\s*(【[^【】]{1,10}】)/g, '$2');     // 【所以】，【因此】 → 【因此】
+  }
+  return t.replace(/【\s*】/g, '');
+}
+
 const ERR = {
   PREVIEW:'這是預覽頁面，沒有連上 AI。',
   NO_KEY:'AI 還沒準備好，請告訴老師。',
@@ -488,6 +527,7 @@ async function doPolish(){
 }
 
 function renderResult(r){
+  ['o','r','i','d'].forEach(k => { r[k] = tidyConn(r[k]); });
   lastResult = r;
   copied = { o:false, r:false, i:false, d:false };
   const total = STEPS.reduce((n, s) => n + countChars(plain(r[s.key])), 0);
@@ -534,6 +574,48 @@ function switchMode(m){
   if (cur > 0){ save(); show(cur); toast(`已換成「${MODES[m].label}」模式，你寫的字都還在喔！`); }
   else show(0);
 }
+
+/* ===== 鍵盤避讓：打字時把輸入框移到鍵盤上方 ===== */
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+let kbTimers = [];
+function visibleBox(){
+  const vv = window.visualViewport;
+  // 知道鍵盤高度（一般瀏覽器）→ 用實際可見範圍
+  if (vv && vv.height < window.innerHeight - 80) return { top:vv.offsetTop, height:vv.height };
+  // 不知道（例如 Apps Script 內嵌框架）→ 假設下半部會被鍵盤蓋住
+  return { top:0, height:window.innerHeight * 0.48 };
+}
+function keepInView(){
+  const ta = $('#ta');
+  if (!ta || document.activeElement !== ta) return;
+  const box = visibleBox();
+  const conn = document.querySelector('.conn-row');
+  const meter = document.querySelector('.meter');
+  const bottom = (meter || ta).getBoundingClientRect().bottom;
+  // 放得下就連「連接詞」一起露出來，放不下就讓輸入框貼齊上緣
+  const topEl = conn && (bottom - conn.getBoundingClientRect().top) <= box.height - 16 ? conn : ta;
+  const top = topEl.getBoundingClientRect().top;
+  const visTop = box.top + 10, visBottom = box.top + box.height - 10;
+  if (top < visTop || bottom > visBottom) window.scrollBy({ top: top - visTop, behavior:'smooth' });
+}
+document.addEventListener('focusin', e => {
+  if (e.target.id !== 'ta' || !IS_TOUCH) return;
+  document.body.classList.add('typing');
+  kbTimers.forEach(clearTimeout);
+  kbTimers = [350, 750].map(ms => setTimeout(keepInView, ms));   // 等鍵盤動畫跑完
+});
+document.addEventListener('focusout', e => {
+  if (e.target.id !== 'ta') return;
+  setTimeout(() => { if (document.activeElement?.id !== 'ta') document.body.classList.remove('typing'); }, 250);
+});
+if (window.visualViewport){
+  let raf = 0;
+  visualViewport.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(keepInView); });
+}
+// 打字時按連接詞或開頭詞，不要讓鍵盤收起來
+document.addEventListener('mousedown', e => {
+  if (document.activeElement?.id === 'ta' && e.target.closest('.chip')) e.preventDefault();
+});
 
 /* ===== 事件 ===== */
 let pendingNew = false;
