@@ -1,108 +1,580 @@
-<!doctype html>
-<html lang="zh-Hant-TW">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-  <title>生字跟讀</title>
-  <meta name="theme-color" content="#EEF3E8" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#21382C" media="(prefers-color-scheme: dark)">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📗</text></svg>">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css">
-</head>
-<body class="student">
-  <div id="banner" class="banner" role="status" hidden></div>
+<title>ORID 寫作小幫手</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<!-- 老師設定由 Apps Script（Code.gs 的 CONFIG）帶入；直接開啟本檔時使用預設值 -->
+<script id="cfg" type="application/json"><?!= configJson ?></script>
+<style>
+/* 版面概念：一本「綠格稿紙」作文簿，一頁只寫一格想法；上方四色路線，最後一頁攤開稿紙抄寫 */
+:root{
+  --paper:#f2f5f1; --sheet:#ffffff; --ink:#1d3530; --ink-soft:#4f6862; --line:#b9cfc4; --grid:#5f9c83;
+  --accent:#1f7a5c; --accent-ink:#ffffff;
+  --o:#2f6fb5; --o-bg:#e5effa; --r:#c4466a; --r-bg:#fbe8ee; --i:#b07a0c; --i-bg:#fbf1d9; --d:#2c8a4e; --d-bg:#e2f3e7;
+  --star:#e8a100; --warn:#b4471d; --warn-bg:#fdebe3;
+  --font-display:"Huninn","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  --font-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  --font-kai:"LXGW WenKai TC","BiauKai","DFKai-SB","標楷體","Kaiti TC",serif;
+  --radius:16px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#141c1a; --sheet:#1d2725; --ink:#e3ece8; --ink-soft:#a5b8b2; --line:#36504a; --grid:#5aa88a;
+    --accent:#3fae86; --accent-ink:#0d1714;
+    --o:#7fb2ec; --o-bg:#1c2b3c; --r:#f08aa8; --r-bg:#3a2029; --i:#e6b54d; --i-bg:#372c14; --d:#6fcf8f; --d-bg:#17321f;
+    --star:#f2b632; --warn:#f19a76; --warn-bg:#3a2219; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#141c1a; --sheet:#1d2725; --ink:#e3ece8; --ink-soft:#a5b8b2; --line:#36504a; --grid:#5aa88a;
+  --accent:#3fae86; --accent-ink:#0d1714;
+  --o:#7fb2ec; --o-bg:#1c2b3c; --r:#f08aa8; --r-bg:#3a2029; --i:#e6b54d; --i-bg:#372c14; --d:#6fcf8f; --d-bg:#17321f;
+  --star:#f2b632; --warn:#f19a76; --warn-bg:#3a2219; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--paper)}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:17px;line-height:1.7;margin:0;padding-inline:16px;padding-block:16px 60px}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--font-display);font-weight:400;margin:0;text-wrap:balance;line-height:1.3}
+p{margin:0}
+button{font:inherit;cursor:pointer}
+button:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn{border:0;border-radius:999px;padding:10px 20px;background:var(--accent);color:var(--accent-ink);font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--line)}
+.btn.small{padding:6px 14px;font-size:15px}
+.btn.big{font-size:20px;padding:14px 28px}
+.btn.colored{background:var(--c);color:#fff}
 
-  <main id="app">
-    <section id="screen-loading" class="screen screen-center">
-      <p class="loading">準備中…</p>
-    </section>
+/* 頁首 */
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.brand{font-family:var(--font-display);font-size:22px;display:flex;align-items:center;gap:8px}
+.brand .orid{display:inline-flex;gap:2px}
+.brand .orid b{font-weight:400;display:inline-grid;place-items:center;width:1.3em;height:1.3em;border-radius:7px;color:#fff;font-size:.8em}
+.stars{display:flex;align-items:center;gap:2px;font-size:14px;color:var(--ink-soft)}
+.stars .s{font-size:22px;color:var(--line);transition:transform .3s,color .3s}
+.stars .s.on{color:var(--star);transform:scale(1.15)}
 
-    <section id="screen-error" class="screen screen-center" hidden>
-      <p id="error-text" class="error-text"></p>
-      <button id="btn-retry" class="btn btn-ghost" type="button">重新整理</button>
-    </section>
+/* 路線（進度） */
+.rail{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;align-items:stretch}
+.stop{border:2px solid var(--line);background:var(--sheet);color:var(--ink-soft);border-radius:12px;padding:4px 2px;display:flex;flex-direction:column;align-items:center;line-height:1.2;position:relative}
+.stop .k{font-family:var(--font-display);font-size:22px}
+.stop .n{font-size:12px}
+.stop .st{position:absolute;top:1px;right:5px;font-size:13px;color:transparent}
+.stop.done .st{color:var(--star)}
+.stop.here{border-color:var(--c);background:var(--cbg);color:var(--c)}
+.stop:disabled{opacity:.4;cursor:default}
+.stop.fin{--c:var(--accent);--cbg:var(--paper)}
 
-    <section id="screen-home" class="screen screen-home" hidden>
-      <header>
-        <p id="hello" class="hello"></p>
-        <h1 class="home-title">今天要練哪個生字？</h1>
-      </header>
-      <section id="assign" class="assign" aria-labelledby="assign-title" hidden>
-        <h2 id="assign-title" class="assign-title">老師指派的生字</h2>
-        <div id="assign-list"></div>
-      </section>
-      <form id="char-form" class="char-form" autocomplete="off" novalidate>
-        <p id="free-label" class="free-label">在格子裡打一個字</p>
-        <label for="char-input" class="sr-only">輸入一個生字</label>
-        <input id="char-input" class="char-input" type="text" inputmode="text" enterkeyhint="go"
-               autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="字"
-               aria-describedby="char-hint">
-        <p id="char-hint" class="hint" aria-live="polite"></p>
-        <button id="btn-start" class="btn btn-primary btn-wide" type="submit" disabled>開始練習</button>
-      </form>
-      <p id="mode-note" class="mode-note" hidden></p>
-    </section>
+/* 每一頁 */
+#stage{overflow-x:clip}
+.page{display:flex;flex-direction:column;gap:14px;animation:slide .35s ease-out}
+@keyframes slide{from{opacity:.2;transform:translateX(24px)}to{opacity:1;transform:none}}
+.card{background:var(--sheet);border:2px solid var(--c,var(--line));border-radius:var(--radius);padding:20px;display:flex;flex-direction:column;gap:14px}
+.card .head{display:flex;gap:14px;align-items:center}
+.card .badge{flex:none;width:60px;height:60px;border-radius:14px;background:var(--c);color:#fff;display:grid;place-items:center;font-family:var(--font-display);font-size:34px}
+.card h2{font-size:clamp(24px,5vw,32px);color:var(--c)}
+.card .step-no{font-size:13px;letter-spacing:.08em;color:var(--ink-soft)}
+.card .sub{font-size:15px;color:var(--ink-soft)}
+.qs{margin:0;padding:12px 14px 12px 34px;background:var(--cbg);border-radius:10px;display:flex;flex-direction:column;gap:2px}
+.qs li::marker{color:var(--c)}
+.chiprow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chiprow .lab{font-size:13px;color:var(--ink-soft);margin-right:2px;letter-spacing:.05em}
+.chip{border:2px solid var(--c);background:var(--sheet);color:var(--c);border-radius:999px;padding:2px 12px;font-size:16px}
+.chip.conn{background:var(--cbg);border-style:dashed}
+.chip.mood{border-color:var(--line);color:var(--ink)}
+textarea{font:inherit;color:var(--ink);background:var(--sheet);border:2px solid var(--cbg);border-radius:12px;padding:10px 14px;width:100%;min-height:150px;resize:vertical;font-size:20px;line-height:1.8}
+textarea:focus{border-color:var(--c);outline:none}
+.meter{display:flex;align-items:center;gap:10px;font-size:15px;color:var(--ink-soft);flex-wrap:wrap}
+.bar{flex:1;min-width:120px;height:10px;background:var(--cbg);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--c);border-radius:99px;transition:width .3s}
+.cnt{font-variant-numeric:tabular-nums;color:var(--ink)}
+.cnt b{color:var(--c)}
+.nav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.o{--c:var(--o);--cbg:var(--o-bg)} .r{--c:var(--r);--cbg:var(--r-bg)} .i{--c:var(--i);--cbg:var(--i-bg)} .d{--c:var(--d);--cbg:var(--d-bg)}
 
-    <section id="screen-practice" class="screen screen-practice" hidden>
-      <header class="practice-head">
-        <button id="btn-home" class="btn btn-text" type="button">結束</button>
-        <div class="progress">
-          <span class="seed" aria-label="正在練習的生字"><span id="seed-char"></span></span>
-          <ol id="rounds" class="rounds" aria-label="練習進度"></ol>
-        </div>
-        <button id="btn-swap" class="btn btn-text" type="button">換一個詞</button>
-      </header>
+/* 開始頁 */
+.welcome{--c:var(--grid);--cbg:var(--paper)}
+.welcome h1{font-size:clamp(28px,6vw,38px)}
+.route{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.route div{background:var(--cbg);border-radius:12px;padding:10px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px}
+.route b{font-family:var(--font-display);font-weight:400;font-size:28px;color:var(--c)}
+.route span{font-size:14px}
+@media (max-width:520px){.route{grid-template-columns:repeat(2,1fr)}}
+.resume{background:var(--paper);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.resume .btns{display:flex;gap:8px;flex-wrap:wrap}
 
-      <div class="stage">
-        <p id="step-label" class="step-label"></p>
-        <div id="word" class="word" role="img"></div>
-        <div id="reading" class="reading" hidden></div>
-      </div>
+/* 完成頁 */
+.review{display:flex;flex-direction:column;gap:8px}
+.rv{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:10px;background:var(--cbg)}
+.rv b{font-family:var(--font-display);font-weight:400;color:var(--c);font-size:20px;line-height:1.5}
+.rv p{flex:1;min-width:0;font-size:16px;overflow-wrap:anywhere}
+.rv button{flex:none;border:0;background:transparent;color:var(--c);font-size:14px;text-decoration:underline}
+.notice{padding:10px 14px;border-radius:10px;background:var(--warn-bg);color:var(--warn);font-size:15px}
+.praise{display:flex;gap:12px;align-items:flex-start;background:var(--paper);border-radius:12px;padding:12px 14px}
+.praise .face{font-size:32px;line-height:1}
+.praise .tip{color:var(--ink-soft);font-size:15px;margin-top:4px}
+.sheet{background:var(--sheet);border:3px double var(--grid);border-radius:6px;padding:14px;overflow-x:auto}
+.sheet .title{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;font-family:var(--font-kai);font-size:20px;border-bottom:2px solid var(--grid);padding-bottom:8px;margin-bottom:10px}
+.sheet .title small{font-size:15px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.para{display:flex;flex-wrap:wrap;margin-bottom:12px;--cell:2.1em;font-family:var(--font-kai);font-size:22px}
+@media (max-width:560px){.para{font-size:18px}}
+.para .cell{width:var(--cell);height:var(--cell);display:grid;place-items:center;border:1px solid var(--line);margin:0 -1px -1px 0;line-height:1}
+.para .cell.cn{color:var(--c);font-weight:700;background:var(--cbg)}
+.para.reading .cell{border-color:var(--c)}
+.para-tag{display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:4px;color:var(--c);flex-wrap:wrap}
+.para-tag b{font-family:var(--font-display);font-weight:400;font-size:16px}
+.para-tag .mini{border:2px solid var(--c);background:var(--sheet);color:var(--c);border-radius:999px;padding:0 10px;font-size:14px}
+.para-tag .mini.done-btn{margin-left:auto}
+.para-tag .mini[aria-pressed=true]{background:var(--c);color:#fff}
+.legend{font-size:14px;color:var(--ink-soft);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.legend .sw{display:inline-block;width:1.2em;height:1.2em;border:1px solid var(--line);background:var(--o-bg);vertical-align:-3px}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:inline-flex;border:2px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--ink);padding:6px 12px;font-size:15px}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
 
-      <div class="dock">
-        <p id="heard" class="heard" aria-live="polite"></p>
-        <p id="feedback" class="feedback" aria-live="assertive"></p>
-        <div id="self-check" class="self-check" hidden>
-          <button id="btn-again" class="btn btn-ghost" type="button">再念一次</button>
-          <button id="btn-ok" class="btn btn-primary" type="button">我念對了</button>
-        </div>
-        <div class="actions">
-          <button id="btn-listen" class="btn btn-round" type="button" aria-label="再聽一次">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 8.5a5 5 0 0 1 0 7" fill="none"/><path d="M18.5 6a8.5 8.5 0 0 1 0 12" fill="none"/></svg>
-            <span>再聽</span>
-          </button>
-          <button id="btn-mic" class="btn btn-mic" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none"/></svg>
-            <span id="mic-label">換我念</span>
-          </button>
-          <button id="btn-skip" class="btn btn-round is-hidden" type="button" aria-label="先跳過這個詞">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6l8 6-8 6zM15 6h3v12h-3z"/></svg>
-            <span>跳過</span>
-          </button>
-        </div>
-      </div>
+/* 模式切換 */
+.modes{display:inline-flex;border:2px solid var(--grid);border-radius:999px;overflow:hidden;background:var(--sheet)}
+.modes button{border:0;background:transparent;color:var(--ink);padding:6px 14px;font-size:16px;font-weight:700}
+.modes button[aria-pressed=true]{background:var(--grid);color:#fff}
+.mode-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mode-card{border:3px solid var(--line);background:var(--sheet);color:var(--ink);border-radius:14px;padding:14px 12px;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
+.mode-card .ic{font-size:34px;line-height:1.2}
+.mode-card b{font-family:var(--font-display);font-weight:400;font-size:24px}
+.mode-card span{font-size:14px;color:var(--ink-soft)}
+.mode-card[aria-pressed=true]{border-color:var(--grid);background:var(--paper);box-shadow:0 0 0 3px var(--grid) inset}
+.mode-card[aria-pressed=true] b{color:var(--grid)}
+.lab-q{font-size:15px;color:var(--ink-soft)}
 
-      <div id="stamp" class="stamp" aria-hidden="true" hidden>讚</div>
-    </section>
+/* 鼓勵泡泡 */
+.toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;align-items:center;z-index:20;width:min(92vw,520px);pointer-events:none}
+.toast{background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:999px;font-size:17px;box-shadow:0 6px 20px rgba(0,0,0,.18);animation:pop .35s ease-out;text-align:center}
+@keyframes pop{from{transform:translateY(16px) scale(.9);opacity:0}to{transform:none;opacity:1}}
+.spin{display:inline-block;width:1em;height:1em;border:3px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
 
-    <section id="screen-done" class="screen screen-done" hidden>
-      <h1 id="done-title" class="done-title">完成了！</h1>
-      <p id="done-sub" class="done-sub"></p>
-      <ol id="done-list" class="done-list"></ol>
-      <button id="btn-next-assign" class="btn btn-primary btn-wide" type="button" hidden></button>
-      <button id="btn-again-char" class="btn btn-primary btn-wide" type="button">再練一個生字</button>
-    </section>
-  </main>
+<div class="wrap">
+  <header>
+    <div class="brand"><span class="orid" aria-hidden="true"><b style="background:var(--o)">O</b><b style="background:var(--r)">R</b><b style="background:var(--i)">I</b><b style="background:var(--d)">D</b></span>寫作小幫手</div>
+    <div class="modes" role="group" aria-label="寫作模式"><button type="button" data-mode="story" aria-pressed="true">📖 敘事</button><button type="button" data-mode="thanks" aria-pressed="false">💌 感謝</button></div>
+    <div class="stars" aria-label="得到的星星"><span>我的星星</span><span class="s" id="star0">★</span><span class="s" id="star1">★</span><span class="s" id="star2">★</span><span class="s" id="star3">★</span></div>
+  </header>
+  <nav class="rail" id="rail" aria-label="寫作步驟" hidden></nav>
+  <main id="stage"></main>
+</div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <footer id="source" class="source"></footer>
+<script>
+/* ===== 老師設定（由 Apps Script 帶入） ===== */
+const CFG = (function(){
+  const d = { targets:{ o:20, r:15, i:15, d:12 }, speechRate:0.85 };
+  try {
+    const j = JSON.parse(document.getElementById('cfg').textContent.trim());
+    return { targets:Object.assign({}, d.targets, j.targets || {}), speechRate:Number(j.speechRate) || d.speechRate };
+  } catch(e){ return d; }
+})();
+const HAS_GAS = !!(window.google && google.script && google.script.run);
 
-  <script src="assets/config.js"></script>
-  <script src="assets/api.js"></script>
-  <script src="assets/match.js"></script>
-  <script src="assets/speech.js"></script>
-  <script src="assets/app.js"></script>
-</body>
-</html>
+/* ===== 日期工具（Asia/Taipei、yyyy-MM-dd 純文字；寬容解析三種形態） ===== */
+const TZ = 'Asia/Taipei';
+function toYMD(v){
+  if (v == null || v === '') return '';
+  if (typeof v === 'string'){
+    const s = v.trim();
+    const m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+    if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+    const d = new Date(s);
+    return isNaN(d) ? '' : toYMD(d);
+  }
+  if (v instanceof Date){
+    if (isNaN(v)) return '';
+    return new Intl.DateTimeFormat('en-CA',{ timeZone:TZ, year:'numeric', month:'2-digit', day:'2-digit' }).format(v);
+  }
+  return '';
+}
+const todayYMD = () => toYMD(new Date());
+(function dateSelfTest(){
+  const cases = [
+    ['2026-10-06','2026-10-06'],
+    ['2026/10/6','2026-10-06'],
+    [new Date('2026-10-05T16:30:00Z'),'2026-10-06'],
+    ['Tue Oct 06 2026 00:10:00 GMT+0800 (台北標準時間)','2026-10-06']
+  ];
+  const bad = cases.filter(([i,e]) => toYMD(i) !== e);
+  console[bad.length ? 'warn' : 'log']('日期格式自我檢查', bad.length ? '未通過' : '通過', bad);
+})();
+
+/* ===== 本機草稿（只存在這台裝置；失敗也不影響使用） ===== */
+const DRAFT_KEY = 'orid_draft_v2';
+const store = {
+  get(){ try { const v = localStorage.getItem(DRAFT_KEY); return v ? JSON.parse(v) : null; } catch(e){ return null; } },
+  set(v){ try { localStorage.setItem(DRAFT_KEY, JSON.stringify(v)); } catch(e){} },
+  clear(){ try { localStorage.removeItem(DRAFT_KEY); } catch(e){} }
+};
+
+/* ===== 兩種寫作模式（三年級用語）：敘事、感謝 ===== */
+const MODES = {
+  story: {
+    label:'敘事', icon:'📖', hint:'寫一件發生過的事', sheetTitle:'我的 ORID 短文',
+    intro:'跟著四個步驟，一次只想一件事。寫完以後，AI 老師會幫你把句子接起來，你再把它抄到作業簿上。',
+    firstToast:'新的一篇開始囉！先寫你看到了什麼。',
+    lead:{ o:'今天', r:'當時', i:'我發現', d:'所以' },
+    steps:[
+      { key:'o', letter:'O', name:'看到', title:'我看到了什麼？',
+        sub:'像照相機一樣，把看到、聽到、做過的事情寫下來。',
+        qs:['那是什麼時候？在哪裡？和誰在一起？','你的眼睛看到了什麼？耳朵聽到了什麼？','你們做了哪些事？先做什麼，後來做什麼？'],
+        starters:['我看到','我聽到','我們一起','老師帶我們'],
+        conns:['今天','首先','一開始','接著','然後','最後'],
+        praise:['你的眼睛像偵探一樣厲害！','哇，你把看到的事寫得好清楚！','好仔細喔，讀的人好像也到了現場！'] },
+      { key:'r', letter:'R', name:'感受', title:'我覺得怎麼樣？',
+        sub:'說說你的心情，還有心情是什麼時候出現的。',
+        qs:['那時候你的心情是什麼？','哪一刻最開心、最驚訝或最緊張？','你的身體有什麼反應？（拍手、心跳很快、笑出來……）'],
+        starters:['我覺得','讓我很','我的心裡','我忍不住'],
+        conns:['當時','那時候','看到這裡','這讓我','一想到'],
+        moods:['開心','興奮','驚訝','緊張','害怕','難過','感動','好奇','得意','放心'],
+        praise:['你把心情說出來了，好勇敢！','我感受到你的心情了！','寫出感覺的文章最動人了！'] },
+      { key:'i', letter:'I', name:'想到', title:'我想到了什麼？',
+        sub:'想一想：為什麼會這樣？你學到了什麼？',
+        qs:['為什麼會發生這件事？','你發現了什麼？學到了什麼？','這件事讓你想到哪一件事或哪一個人？'],
+        starters:['我發現','原來','這讓我想到','我學到'],
+        conns:['因為','原來','我發現','這讓我明白','也就是說'],
+        praise:['你好會思考，像小小科學家！','這個想法很棒！','你從這件事學到東西了，真厲害！'] },
+      { key:'d', letter:'D', name:'要做', title:'我以後要怎麼做？',
+        sub:'把學到的事情變成行動，寫下你的決定。',
+        qs:['以後遇到一樣的事，你會怎麼做？','你想要改變什麼？想要繼續做什麼？','你想邀請誰一起做？'],
+        starters:['以後我要','下次我會','我決定','我想要'],
+        conns:['所以','因此','以後','下次','我決定','從今天起'],
+        praise:['有行動的決定最了不起！','你的決定好棒，一定做得到！','說到做到，你是行動小達人！'] }
+    ]
+  },
+  thanks: {
+    label:'感謝', icon:'💌', hint:'寫這週想說謝謝的事', sheetTitle:'我的感謝小短文',
+    intro:'先想一想這一週，誰幫過你、對你好？可能有好幾件，請挑一件「最想說謝謝」的來寫。家人、同學、老師、鄰居、寵物，甚至是自己都可以喔！',
+    firstToast:'感謝小短文開始囉！先想想這週誰幫了你。',
+    lead:{ o:'這個星期', r:'那時候', i:'多虧了', d:'所以' },
+    steps:[
+      { key:'o', letter:'O', name:'發生', title:'誰幫了我？發生什麼事？',
+        sub:'挑一件最想說謝謝的事，像照相機一樣把經過寫下來。寫稱呼就好（媽媽、阿嬤、同學小安），不用寫全名。',
+        qs:['這一週，誰幫了你或對你很好？','那是什麼時候？在哪裡？','他做了什麼事？說了什麼話？'],
+        starters:['這個星期','那天','我想謝謝','當我'],
+        conns:['這個星期','那天','當時','剛好','後來'],
+        praise:['你記得別人對你的好，真是貼心的孩子！','你把經過寫得好清楚！','能發現別人的幫忙，你的眼睛好亮！'] },
+      { key:'r', letter:'R', name:'心情', title:'我心裡覺得怎麼樣？',
+        sub:'他幫你的時候，你的心裡有什麼感覺？',
+        qs:['那時候你的心情是什麼？','你的心裡有沒有暖暖的、放心的感覺？','你當時有沒有說謝謝？說了什麼？'],
+        starters:['我覺得','我的心裡','讓我很','我忍不住'],
+        conns:['那時候','這讓我','聽到這句話','一下子','於是'],
+        moods:['溫暖','感動','開心','放心','安心','幸福','驚喜','不好意思','被照顧'],
+        praise:['你把心裡暖暖的感覺寫出來了！','這份心情好溫暖！','讀了你的心情，老師也覺得好幸福！'] },
+      { key:'i', letter:'I', name:'意義', title:'這件事為什麼重要？',
+        sub:'想一想：如果沒有他幫忙，會怎麼樣？',
+        qs:['如果沒有他幫忙，會發生什麼事？','你發現他是一個怎麼樣的人？','這件事讓你明白了什麼？'],
+        starters:['如果沒有','原來','我發現','我明白了'],
+        conns:['多虧了','幸好','要不是','如果沒有','原來','因為'],
+        praise:['你懂得別人的用心，好了不起！','這個想法很溫暖！','你想得好深入，真會思考！'] },
+      { key:'d', letter:'D', name:'回報', title:'我要怎麼謝謝他？',
+        sub:'把感謝變成一句話或一個行動。',
+        qs:['你想對他說什麼話？','你想為他做一件什麼事？','以後你也想像他一樣幫助誰？'],
+        starters:['我想對他說','謝謝你','我要','下次我也要'],
+        conns:['所以','因此','我決定','下次','以後我也要'],
+        praise:['把感謝說出來，最有力量！','你的回報好用心，他一定很開心！','你也會成為別人的小天使！'] }
+    ]
+  }
+};
+let mode = 'story';
+let STEPS = MODES.story.steps;
+const ALL_CONNS = [...new Set(Object.values(MODES).flatMap(m => m.steps.flatMap(s => s.conns)).concat(['而且','可是','後來','於是']))]
+  .sort((a, b) => b.length - a.length);   // 長的先比對，「以後我也要」優先於「以後」
+function setMode(m){
+  mode = MODES[m] ? m : 'story';
+  STEPS = MODES[mode].steps;
+  document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+  const ml = document.getElementById('modeLabel'); if (ml) ml.textContent = MODES[mode].icon + ' ' + MODES[mode].label;
+}
+const LAST = STEPS.length + 1;   // 0 開始頁、1~4 ORID、5 完成頁
+
+/* ===== 狀態 ===== */
+let draft = emptyDraft();
+let cur = 0, furthest = 0;
+let reached = { o:false, r:false, i:false, d:false };
+let copied = { o:false, r:false, i:false, d:false };
+let lastResult = null;
+let rate = CFG.speechRate;
+function emptyDraft(){ return { mode, o:'', r:'', i:'', d:'', page:1, furthest:1, savedAt:'' }; }
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const countChars = s => (String(s).match(/[㐀-鿿豈-﫿a-zA-Z0-9]/g) || []).length;
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const plain = s => String(s).replace(/[【】]/g, '');
+
+function toast(msg){
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  $('#toasts').appendChild(t); setTimeout(() => t.remove(), 3200);
+}
+function save(){ draft.mode = mode; draft.page = cur; draft.furthest = furthest; draft.savedAt = todayYMD(); store.set(draft); }
+
+/* ===== 唸讀 ===== */
+let voice = null;
+function pickVoice(){
+  const vs = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+  voice = vs.find(v => /zh[-_]TW/i.test(v.lang)) || vs.find(v => /zh[-_](HK|Hant)/i.test(v.lang)) || vs.find(v => /^zh/i.test(v.lang)) || null;
+}
+if (window.speechSynthesis){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speak(text, onstart, onend){
+  if (!window.speechSynthesis){ toast('這台裝置不能唸讀，請換 Chrome 或 Edge 試試看'); return; }
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-TW'; if (voice) u.voice = voice; u.rate = rate;
+  if (onstart) u.onstart = onstart;
+  if (onend){ u.onend = onend; u.onerror = onend; }
+  speechSynthesis.speak(u);
+}
+function stopSpeak(){
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  document.querySelectorAll('.para.reading').forEach(p => p.classList.remove('reading'));
+}
+
+/* ===== 星星 ===== */
+function refreshStars(){
+  STEPS.forEach((s, idx) => {
+    reached[s.key] = countChars(draft[s.key]) >= CFG.targets[s.key];
+    $('#star' + idx).classList.toggle('on', reached[s.key]);
+  });
+}
+
+/* ===== 路線 ===== */
+function renderRail(){
+  const rail = $('#rail');
+  rail.hidden = cur === 0;
+  rail.innerHTML = STEPS.map((s, idx) => {
+    const p = idx + 1;
+    return `<button type="button" class="stop ${s.key} ${p === cur ? 'here' : ''} ${reached[s.key] ? 'done' : ''}" data-go="${p}" ${p > furthest ? 'disabled' : ''} aria-current="${p === cur ? 'step' : 'false'}">
+      <span class="st" aria-hidden="true">★</span><span class="k">${s.letter}</span><span class="n">${s.name}</span></button>`;
+  }).join('') + `<button type="button" class="stop fin ${cur === LAST ? 'here' : ''}" data-go="${LAST}" ${LAST > furthest ? 'disabled' : ''}><span class="k">✨</span><span class="n">完成</span></button>`;
+}
+
+/* ===== 各頁 ===== */
+function renderWelcome(){
+  const saved = store.get();
+  const has = saved && ['o','r','i','d'].some(k => countChars(saved[k]));
+  const savedDate = has ? toYMD(saved.savedAt) : '';
+  return `<section class="page"><div class="card welcome">
+    <h1>把想法變成一篇短文</h1>
+    <p class="lab-q">今天想寫哪一種？</p>
+    <div class="mode-cards">${Object.entries(MODES).map(([k, m]) => `<button type="button" class="mode-card" data-mode="${k}" aria-pressed="${k === mode}"><span class="ic" aria-hidden="true">${m.icon}</span><b>${m.label}</b><span>${m.hint}</span></button>`).join('')}</div>
+    <p class="sub">${MODES[mode].intro}</p>
+    <div class="route">
+      ${STEPS.map(s => `<div class="${s.key}"><b>${s.letter}</b><span>${s.title}</span></div>`).join('')}
+    </div>
+    ${has ? `<div class="resume"><p>這台電腦有一篇還沒寫完的${MODES[saved.mode] ? MODES[saved.mode].label : ''}短文${savedDate ? `（${savedDate}）` : ''}。如果不是你寫的，請按「寫新的一篇」。</p>
+      <div class="btns"><button type="button" class="btn" data-act="resume">繼續寫上次的</button><button type="button" class="btn ghost" data-act="fresh">寫新的一篇</button></div></div>`
+      : `<div><button type="button" class="btn big" data-act="fresh">開始寫 →</button></div>`}
+  </div></section>`;
+}
+function renderStep(idx){
+  const s = STEPS[idx];
+  return `<section class="page"><article class="card ${s.key}">
+    <div class="head"><div class="badge" aria-hidden="true">${s.letter}</div>
+      <div><p class="step-no">第 ${idx + 1} 步／共 4 步</p><h2>${s.title}</h2><p class="sub">${s.sub}</p></div></div>
+    <ul class="qs">${s.qs.map(q => `<li>${q}</li>`).join('')}</ul>
+    <div class="chiprow"><span class="lab">開頭可以這樣寫</span>${s.starters.map(w => `<button type="button" class="chip" data-ins="${w}">${w}…</button>`).join('')}</div>
+    <div class="chiprow"><span class="lab">連接詞</span>${s.conns.map(w => `<button type="button" class="chip conn" data-ins="${w}，" data-conn="${w}">${w}</button>`).join('')}</div>
+    ${s.moods ? `<div class="chiprow"><span class="lab">心情詞</span>${s.moods.map(w => `<button type="button" class="chip mood" data-ins="${w}">${w}</button>`).join('')}</div>` : ''}
+    <label class="sub" for="ta">寫在這裡：</label>
+    <textarea id="ta" data-k="${s.key}" placeholder="${s.starters[0]}……">${esc(draft[s.key])}</textarea>
+    <div class="meter"><span class="cnt" id="cnt"></span><span class="bar"><i id="bar"></i></span>
+      <button type="button" class="btn ghost small" data-act="read-mine">🔊 唸給我聽</button></div>
+    <div class="nav">
+      <button type="button" class="btn ghost" data-go="${idx}">${idx === 0 ? '← 回開始' : '← 上一步：' + STEPS[idx - 1].name}</button>
+      <button type="button" class="btn colored" data-act="next">${idx < 3 ? '下一步：' + STEPS[idx + 1].name + ' →' : '寫完了，去整理 →'}</button>
+    </div>
+  </article></section>`;
+}
+function renderFinish(){
+  return `<section class="page"><div class="card" style="--c:var(--grid)">
+    <div class="head"><div class="badge" aria-hidden="true">✨</div><div><h2>四步都寫好了！</h2><p class="sub">先看看自己寫的，想改可以按「修改」。準備好了就請 AI 老師幫你整理。</p></div></div>
+    <div class="review">${STEPS.map((s, idx) => `<div class="rv ${s.key}"><b>${s.letter}</b><p>${esc(draft[s.key])}</p><button type="button" data-go="${idx + 1}">修改</button></div>`).join('')}</div>
+    <div><button type="button" class="btn big" id="polishBtn" data-act="polish">✨ 幫我整理成文章</button></div>
+    <div id="notice" class="notice" hidden></div>
+    <div id="result" hidden></div>
+    <div class="nav"><button type="button" class="btn ghost" data-go="4">← 回到 D</button><button type="button" class="btn ghost" data-act="new">寫新的一篇</button></div>
+  </div></section>`;
+}
+
+function show(p){
+  stopSpeak();
+  cur = Math.max(0, Math.min(LAST, p));
+  if (cur > furthest) furthest = cur;
+  const stage = $('#stage');
+  stage.innerHTML = cur === 0 ? renderWelcome() : cur === LAST ? renderFinish() : renderStep(cur - 1);
+  renderRail();
+  if (cur >= 1 && cur <= 4){ updateCount(STEPS[cur - 1].key, true); const ta = $('#ta'); ta.focus({preventScroll:true}); }
+  if (cur === LAST && lastResult) renderResult(lastResult);
+  window.scrollTo({ top:0, behavior:'smooth' });
+  if (cur > 0) save();
+}
+
+function updateCount(k, silent){
+  const n = countChars(draft[k]), t = CFG.targets[k];
+  $('#cnt').innerHTML = `已寫 <b>${n}</b> 字／目標 ${t} 字` + (n >= t ? '　⭐ 達成！' : `　還差 ${t - n} 字`);
+  $('#bar').style.width = Math.min(100, n / t * 100) + '%';
+  const was = reached[k];
+  refreshStars();
+  if (reached[k] !== was) renderRail();
+  if (reached[k] && !was && !silent){
+    toast('⭐ ' + pick(STEPS.find(x => x.key === k).praise));
+    if (Object.values(reached).every(Boolean)) setTimeout(() => toast('🏅 四顆星全拿到了！你是 ORID 小作家！'), 900);
+  }
+}
+
+function insertAt(text){
+  const ta = $('#ta');
+  const s = ta.selectionStart ?? ta.value.length, e = ta.selectionEnd ?? ta.value.length;
+  ta.value = ta.value.slice(0, s) + text + ta.value.slice(e);
+  ta.focus(); ta.selectionStart = ta.selectionEnd = s + text.length;
+  ta.dispatchEvent(new Event('input', { bubbles:true }));
+}
+
+/* ===== 整理 ===== */
+function callServer(input){
+  return new Promise((resolve, reject) => {
+    if (!HAS_GAS){ reject(new Error('PREVIEW')); return; }
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).polish(input);
+  });
+}
+function polishBasic(input){
+  const fix = s => { s = String(s || '').trim().replace(/\s+/g, '').replace(/,/g, '，'); if (s && !/[。！？!?]$/.test(s)) s += '。'; return s; };
+  const lead = MODES[mode].lead;
+  const out = { source:'basic', praise:'你把四個步驟都寫完了，好有毅力！👏', tip:'抄寫時，試著把有顏色的連接詞唸出聲音。' };
+  STEPS.forEach(s => {
+    let t = fix(input[s.key]);
+    const has = ALL_CONNS.find(c => t.startsWith(c));
+    out[s.key] = has ? `【${has}】` + t.slice(has.length) : `【${lead[s.key]}】` + (s.key === 'i' ? '' : '，') + t;
+  });
+  return out;
+}
+const ERR = {
+  PREVIEW:'這是預覽頁面，沒有連上 AI。',
+  NO_KEY:'AI 還沒準備好，請告訴老師。',
+  KEY_ERROR:'AI 的鑰匙出了問題，請告訴老師。',
+  BUSY:'現在太多同學一起用 AI 了，等一分鐘再按一次。',
+  DAILY_LIMIT:'今天的 AI 整理次數用完了，明天再來試試。',
+  EMPTY:'有一段還沒寫喔。'
+};
+async function doPolish(){
+  stopSpeak();
+  const input = { mode, o:draft.o, r:draft.r, i:draft.i, d:draft.d };
+  const empty = STEPS.findIndex(s => !countChars(input[s.key]));
+  if (empty >= 0){ toast(`「${STEPS[empty].name}」還沒寫喔，加油！`); show(empty + 1); return; }
+  const btn = $('#polishBtn'), notice = $('#notice');
+  notice.hidden = true;
+  btn.disabled = true; btn.innerHTML = '<span class="spin" aria-hidden="true"></span> AI 老師正在讀你的文章…';
+  let r;
+  try {
+    r = await callServer(input);
+    toast('✨ 整理好了！一邊唸一邊抄寫吧！');
+  } catch(e){
+    const msg = String(e && e.message || e);
+    const code = Object.keys(ERR).find(k => msg.includes(k));
+    notice.textContent = (code ? ERR[code] : '整理時出了一點問題。') + ' 先用基本版幫你加上連接詞。';
+    notice.hidden = false;
+    r = polishBasic(input);
+  }
+  btn.disabled = false; btn.textContent = '✨ 再整理一次';
+  renderResult(r);
+  $('#result').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function renderResult(r){
+  lastResult = r;
+  copied = { o:false, r:false, i:false, d:false };
+  const total = STEPS.reduce((n, s) => n + countChars(plain(r[s.key])), 0);
+  const paras = STEPS.map(s => {
+    const segs = String(r[s.key] || '').split(/(【[^【】]{1,10}】)/).filter(Boolean);
+    let cells = '<span class="cell"></span><span class="cell"></span>';
+    segs.forEach(seg => {
+      const isConn = /^【.*】$/.test(seg);
+      [...(isConn ? seg.slice(1, -1) : seg)].forEach(ch => { if (!/\s/.test(ch)) cells += `<span class="cell${isConn ? ' cn' : ''}">${esc(ch)}</span>`; });
+    });
+    return `<div class="${s.key}"><div class="para-tag"><b>${s.letter}</b> ${s.name}・${countChars(plain(r[s.key]))} 字
+      <button type="button" class="mini" data-readp="${s.key}">🔊 唸這段</button>
+      <button type="button" class="mini done-btn" aria-pressed="false" data-copied="${s.key}">我抄好這段了</button></div>
+      <div class="para" id="para-${s.key}">${cells}</div></div>`;
+  }).join('');
+  const box = $('#result');
+  box.innerHTML = `
+    <div class="praise"><div class="face" aria-hidden="true">🌟</div><div><p>${esc(r.praise || '')}</p><p class="tip">小提醒：${esc(r.tip || '')}</p></div></div>
+    <p class="legend" style="margin-top:12px"><span class="sw"></span> 有顏色的格子是「連接詞」，抄的時候要特別注意喔！</p>
+    <div class="sheet" style="margin-top:10px"><div class="title"><span>${MODES[mode].sheetTitle}</span><small>${todayYMD()}　共 ${total} 字</small></div>${paras}</div>
+    <div class="tools" style="margin-top:12px">
+      <button type="button" class="btn" data-act="read-all">🔊 唸整篇給我聽</button>
+      <button type="button" class="btn ghost" data-act="stop">⏹ 停止</button>
+      <span class="seg" role="group" aria-label="唸讀速度"><button type="button" data-rate="0.7" aria-pressed="${rate <= 0.7}">🐢 慢慢唸</button><button type="button" data-rate="${CFG.speechRate > 0.7 ? CFG.speechRate : 0.85}" aria-pressed="${rate > 0.7}">🙂 剛剛好</button></span>
+    </div>`;
+  box.hidden = false;
+}
+function readParas(keys){
+  stopSpeak();
+  keys.forEach((k, idx) => {
+    const p = document.getElementById('para-' + k);
+    speak(plain(lastResult[k]),
+      () => { document.querySelectorAll('.para.reading').forEach(x => x.classList.remove('reading')); p.classList.add('reading'); },
+      () => { p.classList.remove('reading'); if (idx === keys.length - 1) toast('🎧 聽完了！你也試著自己唸一次吧！'); });
+  });
+}
+
+/* ===== 切換模式：已寫的字保留，提問、連接詞、AI 整理方式跟著換 ===== */
+function switchMode(m){
+  if (!MODES[m] || m === mode) return;
+  stopSpeak();
+  setMode(m);
+  lastResult = null;
+  if (cur > 0){ save(); show(cur); toast(`已換成「${MODES[m].label}」模式，你寫的字都還在喔！`); }
+  else show(0);
+}
+
+/* ===== 事件 ===== */
+let pendingNew = false;
+document.addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.mode){ switchMode(t.dataset.mode); return; }
+  if (t.dataset.go !== undefined){ show(Number(t.dataset.go)); return; }
+  if (t.dataset.ins){ insertAt(t.dataset.ins); if (t.dataset.conn) toast(`你用了連接詞「${t.dataset.conn}」，句子變得更通順了！`); return; }
+  if (t.dataset.readp){ readParas([t.dataset.readp]); return; }
+  if (t.dataset.rate){ rate = Number(t.dataset.rate); t.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === t))); return; }
+  if (t.dataset.copied){
+    const k = t.dataset.copied; copied[k] = !copied[k];
+    t.setAttribute('aria-pressed', String(copied[k])); t.textContent = copied[k] ? '✓ 抄好了' : '我抄好這段了';
+    if (copied[k]){ const n = Object.values(copied).filter(Boolean).length; toast(n === 4 ? '🏆 全部抄完了！字寫得工整的你最棒！' : `✏️ 抄好 ${n} 段了，再 ${4 - n} 段就完成！`); }
+    return;
+  }
+  switch (t.dataset.act){
+    case 'fresh': draft = emptyDraft(); lastResult = null; furthest = 1; refreshStars(); show(1); toast(MODES[mode].firstToast); break;
+    case 'resume': { const s = store.get(); setMode(s.mode); draft = Object.assign(emptyDraft(), s); furthest = Math.min(LAST, Number(draft.furthest) || 1); refreshStars(); show(Math.min(LAST, Number(draft.page) || 1)); toast('歡迎回來！接著寫吧！'); break; }
+    case 'next': {
+      const s = STEPS[cur - 1];
+      if (!countChars(draft[s.key])){ toast('先寫一點點，再往下走喔！'); $('#ta').focus(); break; }
+      show(cur + 1); break;
+    }
+    case 'read-mine': { const txt = draft[STEPS[cur - 1].key].trim(); if (!txt){ toast('先寫一點點，我再唸給你聽！'); break; } stopSpeak(); speak(txt); break; }
+    case 'polish': doPolish(); break;
+    case 'read-all': if (lastResult) readParas(STEPS.map(s => s.key)); break;
+    case 'stop': stopSpeak(); break;
+    case 'new':
+      if (!pendingNew){ pendingNew = true; t.textContent = '確定嗎？再按一次'; setTimeout(() => { pendingNew = false; t.textContent = '寫新的一篇'; }, 3000); break; }
+      pendingNew = false; store.clear(); draft = emptyDraft(); lastResult = null; furthest = 0; refreshStars(); show(0); break;
+  }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'ta'){ const k = e.target.dataset.k; draft[k] = e.target.value; updateCount(k); save(); }
+});
+
+/* ===== 啟動：一律先到開始頁，讓共用電腦的下一位同學可以選「寫新的一篇」 ===== */
+(function boot(){
+  const s = store.get();
+  setMode(s && s.mode);
+  show(0);
+})();
+</script>
